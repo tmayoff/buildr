@@ -1,16 +1,25 @@
+#ifndef BOOTSTRAP_ONLY
+import compile_db;
+#endif
+
 #include <boost/asio/io_context.hpp>
 #include <boost/process.hpp>
 #include <boost/program_options.hpp>
 #include <filesystem>
 #include <format>
 #include <iostream>
+#include <print>
+#include <ranges>
 
 #define TOML_EXCEPTIONS 0
 #define TOML_IMPLEMENTATION
 #include <toml++/toml.hpp>
 
+namespace fs = std::filesystem;
+
 struct BuildOptions {
-  std::vector<std::filesystem::path> sources;
+  fs::path build_root = "build";
+  std::vector<fs::path> sources;
   std::vector<std::string> dependencies;
 };
 
@@ -34,6 +43,10 @@ int main(int argc, char **argv) {
 
   auto const opts = read_config();
   build(opts);
+
+#ifndef BOOTSTRAP_ONLY
+  // generate();
+#endif
 }
 
 BuildOptions read_config() {
@@ -79,23 +92,59 @@ auto get_dep_options(std::vector<std::string> deps) {
   return opts;
 }
 
+auto compile_source_file(fs::path build_root, fs::path source) {
+  fs::path out = build_root / fs::path(source.stem().string() + ".o");
+
+  std::vector<std::string> args = {"-std=c++23"};
+  args.push_back("-fprebuilt-module-path=build");
+  args.push_back("-lboost_program_options");
+
+  if (source.extension() == ".cppm") {
+    std::println("Compiling module file");
+    out = build_root / fs::path(source.stem().string() + ".pcm");
+    args.push_back("--precompile");
+  } else {
+    // args.push_back("-r");
+  }
+
+  auto const cmd = std::format("{} {} {} -c -o {}", "clang++",
+                               boost::algorithm::join(args, " "),
+                               source.string(), out.string());
+  std::println("{}", cmd);
+  system(cmd.c_str());
+
+  return out;
+}
+
 void build(BuildOptions const &opts) {
   namespace fs = std::filesystem;
-  const fs::path build_dir = "build";
+
+  auto const &build_dir = opts.build_root;
   if (!fs::exists(build_dir))
     std::filesystem::create_directory(build_dir);
 
   const std::string compiler = "clang++";
-  std::vector<std::filesystem::path> sources = {"src/main.cpp"};
+  std::vector<std::filesystem::path> sources = {"src/compile_db.cppm",
+                                                "src/main.cpp"};
 
   const auto deps = get_dep_options(opts.dependencies);
 
+  std::vector<fs::path> objs;
   for (const auto &src : sources) {
-    auto const cmd =
-        std::format("{} {} -DTOML_EXCEPTIONS=0 -o build/buildr {} {} -g "
-                    "-lboost_program_options",
-                    compiler, src.string(), "-std=c++23", deps);
-    std::cout << "compiling: " << cmd << std::endl;
-    system(cmd.c_str());
+    objs.push_back(compile_source_file(build_dir, src));
   }
+
+  std::vector<std::string> const paths =
+      objs |
+      std::ranges::views::transform([](auto const &p) { return p.string(); }) |
+      std::ranges::to<std::vector>();
+
+  std::string args =
+      "-lboost_program_options -fno-builtin-memset -fno-builtin-memcpy";
+  args += " " + deps;
+  auto const cmd = std::format("{} {} {} -o build/buildr", "clang++",
+                               boost::algorithm::join(paths, " "), args);
+  std::println("{}", cmd);
+
+  system(cmd.c_str());
 }

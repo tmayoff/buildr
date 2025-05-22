@@ -1,6 +1,7 @@
 {
   description = "Flake utils demo";
 
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = {
@@ -19,7 +20,11 @@
           src = ./.;
 
           nativeBuildInputs = with pkgs; [pkg-config];
-          buildInputs = with pkgs; [boost tomlplusplus];
+          buildInputs = with pkgs; [
+            boost
+            tomlplusplus
+            nlohmann_json
+          ];
 
           buildPhase = ''
             ./bootstrap.sh
@@ -35,7 +40,7 @@
 
         packages.default = buildr;
 
-        devShell = pkgs.mkShell.override {stdenv = pkgs.clangStdenv;} {
+        devShell = pkgs.mkShell.override {stdenv = pkgs.llvmPackages_20.stdenv;} {
           nativeBuildInputs = with pkgs; [
             clang-tools
 
@@ -43,6 +48,7 @@
             cmake
 
             lldb
+            libllvm
 
             meson
             muon

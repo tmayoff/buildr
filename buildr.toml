@@ -1,2 +1,2 @@
 srcs = ['src/main.cpp']
-dependencies = ["boost", "tomlplusplus"]
+dependencies = ["boost", "tomlplusplus", "nlohmann_json"]
