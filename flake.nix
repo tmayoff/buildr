@@ -18,12 +18,11 @@
           name = "buildr";
           src = ./.;
 
-          buildInputs = with pkgs; [boost];
+          nativeBuildInputs = with pkgs; [pkg-config];
+          buildInputs = with pkgs; [boost tomlplusplus];
 
           buildPhase = ''
             ./bootstrap.sh
-            ls -la
-
             ./buildr-bootstrap
           '';
 
@@ -43,6 +42,8 @@
             pkg-config
             cmake
 
+            lldb
+
             meson
             muon
             ninja
@@ -51,6 +52,7 @@
           buildInputs = with pkgs; [
             boost
             tomlplusplus
+            nlohmann_json
           ];
         };
       }

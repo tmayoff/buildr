@@ -1,2 +1,2 @@
-[exe]
 srcs = ['src/main.cpp']
+dependencies = ["boost", "tomlplusplus"]
