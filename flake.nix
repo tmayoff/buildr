@@ -18,16 +18,19 @@
           name = "buildr";
           src = ./.;
 
+          buildInputs = with pkgs; [boost];
+
           buildPhase = ''
             ./bootstrap.sh
+            ls -la
 
-            buildr-bootstrap
+            ./buildr-bootstrap
           '';
 
           installPhase = ''
-            mkdir $out
+            mkdir -p $out/bin
 
-            cp build/buildr $out
+            cp build/buildr $out/bin
           '';
         };
 
