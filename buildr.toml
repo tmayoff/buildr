@@ -1,2 +1,8 @@
-srcs = ['src/main.cpp']
-dependencies = ["boost", "tomlplusplus", "nlohmann_json"]
+srcs = ['src/compile_db.cppm', 'src/main.cpp']
+compile_args = ["-std=c++26"]
+link_args = []
+
+[dependencies]
+boost = {modules = ["system", "program_options", "process"]}
+tomlplusplus = {}
+nlohmann_json = {}

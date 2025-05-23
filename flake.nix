@@ -42,13 +42,13 @@
 
         devShell = pkgs.mkShell.override {stdenv = pkgs.llvmPackages_20.stdenv;} {
           nativeBuildInputs = with pkgs; [
-            clang-tools
+            llvmPackages_20.clang-tools
 
             pkg-config
             cmake
 
-            lldb
-            libllvm
+            # lldb
+            # libllvm
 
             meson
             muon
