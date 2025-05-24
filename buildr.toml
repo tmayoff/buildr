@@ -1,4 +1,4 @@
-srcs = ['src/config.cppm', 'src/compile_db.cppm', 'src/main.cppm']
+srcs = ['src/config.cppm', 'src/compile_db.cppm', 'src/main.cpp']
 compile_args = ["-std=c++26", "-DTOMLPLUSPLUS_BUILD_MODULES"]
 link_args = ["-lc"]
 

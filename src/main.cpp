@@ -56,7 +56,7 @@ auto main(int argc, char **argv) -> int {
   build(opts);
 
 #ifndef BOOTSTRAP_ONLY
-  generate();
+  // generate();
 #endif
 }
 

@@ -8,7 +8,7 @@ module;
 
 export module compile_db;
 
-namespace compiledb {
+export namespace compiledb {
 
 struct CompileDatabase {
   std::filesystem::path directory;
