@@ -12,7 +12,7 @@ struct Args {
   std::variant<BuildArgs> subcommand;
 };
 
-BOOST_DESCRIBE_STRUCT(Args, (), ());
+BOOST_DESCRIBE_STRUCT(Args, (), (subcommand));
 
 auto main(int argc, char** argv) -> int {
   const auto args = clap::parse_args<Args>(argc, argv);
