@@ -14,6 +14,16 @@
         pkgs = import nixpkgs {
           inherit system;
         };
+
+        # toml = pkgs.tomlplusplus.overrideAttrs (old: {
+        #   src = pkgs.fetchFromGitHub {
+        #     owner = "marzer";
+        #     repo = "tomlplusplus";
+        #     rev = "2f35c28a52fd0ada7600273de9aacb66550bcdcb";
+        #     hash = "sha256-iO/lxKrhKF0ILnAHyGDjXOK5ShnnV84oGTNukTLMQQ4=";
+        #   };
+        #   patches = [];
+        # });
       in rec {
         buildr = pkgs.clangStdenv.mkDerivation {
           name = "buildr";

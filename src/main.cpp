@@ -1,7 +1,3 @@
-#ifndef BOOTSTRAP_ONLY
-import compile_db;
-#endif
-
 #include <boost/asio/io_context.hpp>
 #include <boost/process.hpp>
 #include <boost/program_options.hpp>
@@ -30,10 +26,11 @@ struct Dependency {
   std::vector<std::string> compile_args;
 };
 
+void configure(const BuildOptions &opts);
 void build(const BuildOptions &opts);
-BuildOptions read_config();
+auto read_config() -> BuildOptions;
 
-int main(int argc, char **argv) {
+auto main(int argc, char **argv) -> int {
   namespace po = boost::program_options;
 
   po::options_description desc("options");
@@ -56,7 +53,7 @@ int main(int argc, char **argv) {
 #endif
 }
 
-BuildOptions read_config() {
+auto read_config() -> BuildOptions {
   toml::parse_result result = toml::parse_file("buildr.toml");
   if (!result) {
     std::cerr << "Parsing failed:\n" << result.error() << "\n";
@@ -68,7 +65,7 @@ BuildOptions read_config() {
   BuildOptions opts{};
 
   for (const auto &[key, val] : *tbl["dependencies"].as_table()) {
-    opts.dependencies.push_back(std::string(key.str()));
+    opts.dependencies.emplace_back(key.str());
     if (key == "boost") {
       const auto node = *val.as_table();
       const auto boost_modules = *node["modules"].as_array();
@@ -80,7 +77,7 @@ BuildOptions read_config() {
   }
 
   for (const auto &src : *tbl["srcs"].as_array()) {
-    opts.sources.push_back(fs::path(src.as_string()->value_or("")));
+    opts.sources.emplace_back(src.as_string()->value_or(""));
   }
 
   tbl["compile_args"].as_array()->for_each([&](const auto &node) {
@@ -118,7 +115,7 @@ auto get_dep_options(std::vector<std::string> deps) {
 
     if (dep == "boost") {
       dependency.compile_args.push_back(std::format(
-          "-L{}",
+          "-I{}",
           run(std::format("pkg-config --variable=includedir {}", dep))));
 
       dependency.link_args.push_back(std::format(
@@ -150,20 +147,20 @@ auto compile_source_file(fs::path build_root, fs::path source,
   fs::path out = build_root / fs::path(source.stem().string() + ".o");
 
   std::vector<std::string> args = extra_compile_args;
-  // args.insert(args.end(), extra_link_args.begin(), extra_link_args.end());
-  args.push_back("-fprebuilt-module-path=build");
+
+  args.emplace_back("-fprebuilt-module-path=build");
 
   if (source.extension() == ".cppm") {
     std::println("Compiling module file");
     out = build_root / fs::path(source.stem().string() + ".pcm");
-    args.push_back("--precompile");
+    args.emplace_back("--precompile");
   } else {
     std::println("Compiling cpp file");
   }
 
-  const auto cmd = std::format("{} -c {} {} -o {}", "clang++",
-                               boost::algorithm::join(args, " "),
-                               source.string(), out.string());
+  const auto cmd = std::format("{} {} -o {} -c {}", "clang++",
+                               boost::algorithm::join(args, " "), out.string(),
+                               source.string());
   std::println("{}", cmd);
   system(cmd.c_str());
 

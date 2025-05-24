@@ -1,6 +1,6 @@
-srcs = ['src/compile_db.cppm', 'src/main.cpp']
-compile_args = ["-std=c++26"]
-link_args = []
+srcs = ['src/main.cpp']
+compile_args = ["-std=c++26", "-DTOMLPLUSPLUS_BUILD_MODULES"]
+link_args = ["-lc"]
 
 [dependencies]
 boost = {modules = ["system", "program_options", "process"]}
