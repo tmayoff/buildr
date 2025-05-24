@@ -11,11 +11,6 @@
 #define TOML_IMPLEMENTATION
 #include <toml++/toml.hpp>
 
-#ifndef BOOTSTRAP_ONLY
-import compile_db;
-import config;
-#endif
-
 namespace fs = std::filesystem;
 
 constexpr auto kCompiler = "clang++";
@@ -35,9 +30,11 @@ struct Dependency {
 
 void configure(const BuildOptions &opts);
 void build(const BuildOptions &opts);
-auto read_config() -> BuildOptions;
+auto read_config(const fs::path& project_dir) -> BuildOptions;
 
 auto main(int argc, char **argv) -> int {
+  fs::path project_dir = fs::current_path();
+
   namespace po = boost::program_options;
 
   po::options_description desc("options");
@@ -52,22 +49,18 @@ auto main(int argc, char **argv) -> int {
     return 1;
   }
 
-  const auto opts = read_config();
+  const auto opts = read_config(project_dir);
   build(opts);
-
-#ifndef BOOTSTRAP_ONLY
-  // generate();
-#endif
 }
 
-auto read_config() -> BuildOptions {
-  toml::parse_result result = toml::parse_file("buildr.toml");
+auto read_config(const fs::path& project_dir) -> BuildOptions {
+  toml::parse_result result = toml::parse_file((project_dir / "buildr.toml").string());
   if (!result) {
     std::cerr << "Parsing failed:\n" << result.error() << "\n";
     std::exit(1);
   }
 
-  auto tbl = result.table();
+  const auto& tbl = result.table();
 
   BuildOptions opts{};
 
@@ -155,7 +148,7 @@ auto compile_source_file(fs::path build_root, fs::path source,
 
   std::vector<std::string> args = extra_compile_args;
 
-  args.emplace_back("-fprebuilt-module-path=build");
+  args.emplace_back(std::format("-fprebuilt-module-path={}", build_root.string()));
 
   if (source.extension() == ".cppm") {
     std::println("Compiling module file");

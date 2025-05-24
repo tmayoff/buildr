@@ -1,4 +1,4 @@
-srcs = ["src/main.cpp"]
+srcs = ["src/build_mod.cppm", "src/main.cpp"]
 compile_args = ["-std=c++26"]
 link_args = ["-lc"]
 

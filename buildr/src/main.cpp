@@ -2,6 +2,8 @@
 #include <boost/program_options.hpp>
 #include <print>
 
+import builder_mod;
+
 // NOLINTNEXTLINE
 BOOST_DEFINE_ENUM_CLASS(Subcommand, unknown, help, build, run, test);
 
@@ -50,3 +52,9 @@ auto main(int argc, char **argv) -> int {
 }
 
 void print_help() { std::println("HELP"); }
+
+void build() {}
+
+void run() {}
+
+void test() {}

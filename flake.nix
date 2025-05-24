@@ -38,8 +38,9 @@
           buildPhase = ''
             cd bootstrap
             make buildr
-            cd buildr
-            ../bootstrap/bootstrapped 
+            cd ../buildr
+            ls -la src
+            ../bootstrap/bootstrapped
           '';
 
           installPhase = ''
