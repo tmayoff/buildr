@@ -2,7 +2,7 @@
 #include <boost/program_options.hpp>
 #include <print>
 
-import builder_mod;
+import build_mod;
 
 // NOLINTNEXTLINE
 BOOST_DEFINE_ENUM_CLASS(Subcommand, unknown, help, build, run, test);

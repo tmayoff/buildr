@@ -39,7 +39,6 @@
             cd bootstrap
             make buildr
             cd ../buildr
-            ls -la src
             ../bootstrap/bootstrapped
           '';
 
