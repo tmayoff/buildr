@@ -1,0 +1,8 @@
+srcs = ["src/main.cpp"]
+compile_args = ["-std=c++26"]
+link_args = ["-lc"]
+
+[dependencies]
+boost = {modules = ["program_options", "process"]}
+tomlplusplus = {}
+nlohmann_json = {}

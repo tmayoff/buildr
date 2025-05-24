@@ -36,8 +36,10 @@
           ];
 
           buildPhase = ''
-            ./bootstrap.sh
-            ./buildr-bootstrap
+            cd bootstrap
+            make buildr
+            cd buildr
+            ../bootstrap/bootstrapped 
           '';
 
           installPhase = ''
@@ -56,7 +58,7 @@
             pkg-config
             cmake
 
-            # lldb
+            lldb
             # libllvm
 
             meson
