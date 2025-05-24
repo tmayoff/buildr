@@ -1,3 +1,7 @@
+#ifndef BOOTSTRAP_ONLY
+module;
+#endif
+
 #include <boost/asio/io_context.hpp>
 #include <boost/process.hpp>
 #include <boost/program_options.hpp>
@@ -11,7 +15,15 @@
 #define TOML_IMPLEMENTATION
 #include <toml++/toml.hpp>
 
+#ifndef BOOTSTRAP_ONLY
+export module main;
+import compile_db;
+import config;
+#endif
+
 namespace fs = std::filesystem;
+
+constexpr auto kCompiler = "clang++";
 
 struct BuildOptions {
   fs::path build_root = "build";
@@ -158,13 +170,13 @@ auto compile_source_file(fs::path build_root, fs::path source,
     std::println("Compiling cpp file");
   }
 
-  const auto cmd = std::format("{} {} -o {} -c {}", "clang++",
+  const auto cmd = std::format("{} {} -o {} -c {}", kCompiler,
                                boost::algorithm::join(args, " "), out.string(),
                                source.string());
   std::println("{}", cmd);
   system(cmd.c_str());
 
-  return out;
+  return std::pair(out, cmd);
 }
 
 void build(const BuildOptions &opts) {
@@ -188,20 +200,38 @@ void build(const BuildOptions &opts) {
                    opts.link_args.end());
 
   std::vector<fs::path> objs;
+  toml::array compile_db;
   for (const auto &src : sources) {
-    objs.push_back(
-        compile_source_file(build_dir, src, compile_args, link_args));
+    auto [out, cmd] =
+        compile_source_file(build_dir, src, compile_args, link_args);
+    objs.push_back(out);
+    const auto &entry = toml::table{
+        {"directory", "/home/tyler/src/buildr"},
+        {"command", cmd},
+        {"file", src.string()},
+        {"output", out.string()},
+    };
+
+    compile_db.push_back(entry);
   }
+
+  std::ofstream c("build/compile_commands.json");
+  c << toml::json_formatter{compile_db};
+  c.close();
 
   const std::vector<std::string> paths =
       objs |
       std::ranges::views::transform([](const auto &p) { return p.string(); }) |
       std::ranges::to<std::vector>();
 
+  std::vector<std::string> args;
+  args.emplace_back("-fprebuilt-module-path=build");
+
   std::println("LINKNING....");
-  const auto cmd = std::format("{} {} {} -o build/buildr", "clang++ ",
-                               boost::algorithm::join(link_args, " "),
-                               boost::algorithm::join(paths, " "));
+  const auto cmd =
+      std::format("{} {} {} {} -o build/buildr", kCompiler,
+                  boost::algorithm::join(link_args, " "),
+                  boost::algorithm::join(paths, " "), boost::join(args, " "));
   std::println("{}", cmd);
 
   system(cmd.c_str());

@@ -14,7 +14,6 @@
         pkgs = import nixpkgs {
           inherit system;
         };
-
         # toml = pkgs.tomlplusplus.overrideAttrs (old: {
         #   src = pkgs.fetchFromGitHub {
         #     owner = "marzer";
@@ -25,7 +24,7 @@
         #   patches = [];
         # });
       in rec {
-        buildr = pkgs.clangStdenv.mkDerivation {
+        buildr = pkgs.llvmPackages_20.stdenv.mkDerivation {
           name = "buildr";
           src = ./.;
 
