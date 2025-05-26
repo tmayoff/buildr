@@ -8,8 +8,6 @@ module;
 #include <string>
 #include <vector>
 
-#include "format.hpp"
-
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.hpp>
 
@@ -27,7 +25,8 @@ export struct BuildTarget {
 
   std::vector<fs::path> sources;
 
-  std::vector<std::string> compiler_args;
+  std::vector<std::string> compile_args;
+  std::vector<std::string> link_args;
 };
 
 export struct ProjectConfig {
@@ -36,7 +35,7 @@ export struct ProjectConfig {
   std::vector<BuildTarget> targets;
 };
 
-const auto get_toml_array_string(const toml::array& array) {
+auto get_toml_array_string(const toml::array& array) -> const auto {
   return std::ranges::views::all(array) |
          std::views::transform(
              [](const auto& node) -> std::optional<std::string> {
@@ -67,8 +66,12 @@ export auto parse_project(const fs::path& dir) {
   default_target.name = dir.stem().string();
 
   if (tbl.contains("compile_args"))
-    default_target.compiler_args =
+    default_target.compile_args =
         get_toml_array_string(*tbl["compile_args"].as_array());
+
+  if (tbl.contains("link_args"))
+    default_target.compile_args =
+        get_toml_array_string(*tbl["link_args"].as_array());
 
   if (tbl.contains("srcs")) {
     default_target.sources =
