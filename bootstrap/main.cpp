@@ -158,7 +158,7 @@ auto compile_source_file(fs::path build_root, fs::path source,
     std::println("Compiling cpp file");
   }
 
-  const auto cmd = std::format("{} {} -o {} -c {}", kCompiler,
+  const auto cmd = std::format("{} {} -g -o {} -c {}", kCompiler,
                                boost::algorithm::join(args, " "), out.string(),
                                source.string());
   std::println("{}", cmd);

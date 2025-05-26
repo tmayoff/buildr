@@ -1,8 +1,8 @@
-srcs = ["src/build_mod.cppm", "src/main.cpp"]
-compile_args = ["-std=c++26"]
-link_args = ["-lc"]
+srcs = ["src/toml.cpp", "src/config_mod.cppm", "src/build_mod.cppm", "src/main.cpp"]
+compile_args = ["-I/home/tyler/src/buildr/buildr/src", "-std=c++26"]
+link_args = ["-I/home/tyler/src/buildr/buildr/src", "-lc"]
 
 [dependencies]
-boost = {modules = ["program_options", "process"]}
+boost = {modules = ["program_options", "process", "json"]}
 tomlplusplus = {}
 nlohmann_json = {}
