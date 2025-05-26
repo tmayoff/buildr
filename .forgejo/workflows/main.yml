@@ -9,4 +9,6 @@ jobs:
 
       - name: Build
         run: |
+          ls -la
+          echo $PWD
           nix build
