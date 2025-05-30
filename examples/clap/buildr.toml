@@ -1,0 +1,6 @@
+srcs = ["src/clap_mod.cppm", "src/main.cpp"]
+compile_args = ["-Isrc", "-std=c++26"]
+link_args = []
+
+[dependencies]
+boost = {}
