@@ -59,7 +59,8 @@
             cmake
 
             lldb
-            # libllvm
+
+            just
 
             meson
             muon

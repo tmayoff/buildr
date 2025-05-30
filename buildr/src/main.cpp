@@ -65,6 +65,8 @@ void build() {
   const auto current_dir = fs::current_path();
   const auto &project_config = config::parse_project(current_dir);
 
+  fs::create_directory(project_config.build_dir);
+
   std::println("Project directory: {}", project_config.root_dir);
   std::println("Build directory: {}", project_config.build_dir);
 

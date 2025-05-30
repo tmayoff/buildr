@@ -52,7 +52,6 @@ export auto build_target(const fs::path& build_dir,
   namespace r = std::ranges;
   namespace rv = r::views;
 
-  std::println(std::cout, "{}", target.compile_args);
   std::vector<std::pair<fs::path, std::string>> commands =
       target.sources |
       rv::transform(
@@ -85,12 +84,13 @@ export auto build_target(const fs::path& build_dir,
 
   boost::asio::io_context ctx;
 
-  // bp::process proc(ctx.get_executor(), kCompiler, args);
-  // const auto ret = proc.wait();
-  // if (ret != 0) {
-  //   std::println(std::cerr, "Link failed: {} {}", kCompiler,
-  //                boost::algorithm::join(args, " "));
-  // }
+  auto ret =
+      system(std::format("{} {}", kCompiler, boost::algorithm::join(args, " "))
+                 .c_str());
+  if (ret != 0) {
+    std::println(std::cerr, "Link failed: {} {}", kCompiler,
+                 boost::algorithm::join(args, " "));
+  }
 }
 
 struct CompileCommandsEntry {
