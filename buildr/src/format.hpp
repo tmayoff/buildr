@@ -137,15 +137,12 @@ struct std::formatter<std::vector<T>, char> {
     for (const auto& obj : t) {
       if (!first) {
         *out++ = ',';
+        *out++ = ' ';
       }
 
       first = false;
 
       out = std::format_to(out, "{}", obj);
-    }
-
-    if (!first) {
-      *out++ = ' ';
     }
 
     *out++ = ']';

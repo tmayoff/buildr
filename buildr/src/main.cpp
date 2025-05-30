@@ -69,9 +69,8 @@ void build() {
   std::println("Build directory: {}", project_config.build_dir);
 
   const auto &default_target = project_config.targets.front();
-  std::println("building: {}", default_target);
+
   std::println("building: {}", default_target.name);
-  std::println("{}", default_target.compile_args);
 
   builder::generate_compile_commands(
       project_config.build_dir, project_config.root_dir,

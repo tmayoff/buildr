@@ -71,11 +71,12 @@ export auto parse_project(const fs::path& dir) {
 
   default_target.name = dir.stem().string();
 
-  default_target.compile_args =
-      get_toml_array_string(*tbl["compile_args"].as_array());
+  if (tbl.contains("compile_args"))
+    default_target.compile_args =
+        get_toml_array_string(*tbl["compile_args"].as_array());
 
   if (tbl.contains("link_args"))
-    default_target.compile_args =
+    default_target.link_args =
         get_toml_array_string(*tbl["link_args"].as_array());
 
   if (tbl.contains("srcs")) {
