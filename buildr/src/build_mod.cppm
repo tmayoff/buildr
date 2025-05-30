@@ -51,6 +51,8 @@ export auto build_target(const fs::path& build_dir,
                          const config::BuildTarget& target) {
   namespace r = std::ranges;
   namespace rv = r::views;
+
+  std::println(std::cout, "{}", target.compile_args);
   std::vector<std::pair<fs::path, std::string>> commands =
       target.sources |
       rv::transform(
