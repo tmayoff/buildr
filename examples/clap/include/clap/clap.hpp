@@ -1,19 +1,3 @@
-<<<<<<< HEAD:examples/clap/include/clap/clap.hpp
-=======
-module;
-
-#include <boost/core/demangle.hpp>
-<<<<<<< HEAD:examples/clap/include/clap/clap.hpp
->>>>>>> 2a1b081 (testing clap):examples/clap/src/clap_mod.cppm
-#include <boost/describe.hpp>
-#include <print>
-=======
-#include <boost/describe.hpp>
-#include <print>
-
-export module clap_mod;
->>>>>>> e7e3986 (testing clap):examples/clap/src/clap_mod.cppm
-
 namespace clap {
 
 class OptionsBuilder {};
@@ -24,17 +8,21 @@ concept DescribeableStruct =
     boost::describe::has_describe_members<T>::value && !std::is_union_v<T>;
 
 template <DescribeableStruct T>
-auto parse_args(int argc, char** argv) -> T {
+auto parse_args(std::ranges::input_range auto&& input_args, T& out) -> T {
+  const auto args = input_args | std::views::drop(1);
+
   const auto type_name = boost::core::demangle(typeid(T).name());
 
-  std::println("Parsing arguments, {} into type: {}", argc, type_name);
+  std::println("Parsing arguments: {} into type: {}", args.size(), type_name);
 
-  using boost_members =
+  using describe_members =
       boost::describe::describe_members<T, boost::describe::mod_any_member>;
 
-  boost::mp11::mp_for_each<boost_members>(
+  using describe_bases =
+      boost::describe::describe_bases<T, boost::describe::mod_any_access>;
 
-      [](const auto& d) { std::println("{}", d.name); });
+  boost::mp11::mp_for_each<describe_members>(
+      [&](auto d) { std::println(" .{}={}", d.name, out.*d.pointer); });
 
   return {};
 }
