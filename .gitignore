@@ -1,3 +1,6 @@
 build
 result
 buildr-bootstrap
+
+.vscode
+.idea

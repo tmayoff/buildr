@@ -30,7 +30,7 @@ struct Dependency {
 
 void configure(const BuildOptions &opts);
 void build(const BuildOptions &opts);
-auto read_config(const fs::path& project_dir) -> BuildOptions;
+auto read_config(const fs::path &project_dir) -> BuildOptions;
 
 auto main(int argc, char **argv) -> int {
   fs::path project_dir = fs::current_path();
@@ -53,14 +53,15 @@ auto main(int argc, char **argv) -> int {
   build(opts);
 }
 
-auto read_config(const fs::path& project_dir) -> BuildOptions {
-  toml::parse_result result = toml::parse_file((project_dir / "buildr.toml").string());
+auto read_config(const fs::path &project_dir) -> BuildOptions {
+  toml::parse_result result =
+      toml::parse_file((project_dir / "buildr.toml").string());
   if (!result) {
     std::cerr << "Parsing failed:\n" << result.error() << "\n";
     std::exit(1);
   }
 
-  const auto& tbl = result.table();
+  const auto &tbl = result.table();
 
   BuildOptions opts{};
 
@@ -148,12 +149,14 @@ auto compile_source_file(fs::path build_root, fs::path source,
 
   std::vector<std::string> args = extra_compile_args;
 
-  args.emplace_back(std::format("-fprebuilt-module-path={}", build_root.string()));
+  args.emplace_back(
+      std::format("-fprebuilt-module-path={}", build_root.string()));
 
   if (source.extension() == ".cppm") {
     std::println("Compiling module file");
     out = build_root / fs::path(source.stem().string() + ".pcm");
     args.emplace_back("--precompile");
+    args.emplace_back("-gmodules");
   } else {
     std::println("Compiling cpp file");
   }
@@ -162,7 +165,7 @@ auto compile_source_file(fs::path build_root, fs::path source,
                                boost::algorithm::join(args, " "), out.string(),
                                source.string());
   std::println("{}", cmd);
-  system(cmd.c_str());
+  if (system(cmd.c_str()) != 0) std::exit(1);
 
   return std::pair(out, cmd);
 }
@@ -217,10 +220,10 @@ void build(const BuildOptions &opts) {
 
   std::println("LINKNING....");
   const auto cmd =
-      std::format("{} {} {} {} -o build/buildr", kCompiler,
+      std::format("{} {} {} {} -g -o build/buildr", kCompiler,
                   boost::algorithm::join(link_args, " "),
                   boost::algorithm::join(paths, " "), boost::join(args, " "));
   std::println("{}", cmd);
 
-  system(cmd.c_str());
+  if (system(cmd.c_str()) != 0) std::exit(1);
 }

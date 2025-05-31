@@ -20,6 +20,7 @@ module;
 export module build_mod;
 
 import config_mod;
+import dependencies_mod;
 
 namespace builder {
 
@@ -28,7 +29,7 @@ constexpr auto kCompiler = "clang++";
 namespace fs = std::filesystem;
 namespace bp = boost::process::v2;
 
-auto get_compiler_command(const fs::path& build_root, const fs::path& source,
+auto get_compile_command(const fs::path& build_root, const fs::path& source,
                           const std::vector<std::string>& extra_args) {
   fs::path out = build_root / fs::path(source.stem().string() + ".o");
 
@@ -41,7 +42,7 @@ auto get_compiler_command(const fs::path& build_root, const fs::path& source,
     out = build_root / fs::path(source.stem().string() + ".pcm");
     args.emplace_back("--precompile");
   }
-  const auto cmd = std::format("{} {} -g -o {} -c {}", kCompiler,
+  const auto cmd = std::format("{} {} -g -gmodules -o {} -c {}", kCompiler,
                                boost::algorithm::join(args, " "), out.string(),
                                source.string());
   return std::pair(out, cmd);
@@ -52,12 +53,17 @@ export auto build_target(const fs::path& build_dir,
   namespace r = std::ranges;
   namespace rv = r::views;
 
+  auto dep_compiler_args = deps::get_compile_args(target.dependencies);
+
+  std::vector<std::string> compile_args = dep_compiler_args;
+  compile_args.insert(compile_args.end(), target.compile_args.begin(),
+                      target.compile_args.end());
+
   std::vector<std::pair<fs::path, std::string>> commands =
       target.sources |
-      rv::transform(
-          [build_dir, args = target.compile_args](const fs::path& source) {
-            return get_compiler_command(build_dir, source, args);
-          }) |
+      rv::transform([build_dir, args = compile_args](const fs::path& source) {
+        return get_compile_command(build_dir, source, args);
+      }) |
       r::to<std::vector>();
 
   std::println(std::cout, "Compiling");
@@ -66,21 +72,27 @@ export auto build_target(const fs::path& build_dir,
     auto ret = system(cmd.c_str());
     if (ret != 0) {
       std::println(std::cerr, "Failed to build target: {}", target.name);
-      std::exit(ret);
+      std::exit(1);
     }
   }
 
   std::println(std::cout, "Linking");
 
-  const auto& deps =
+  const auto& compiled_objs =
       commands |
       rv::transform([](const auto& pair) { return pair.first.string(); }) |
       r::to<std::vector>();
 
-  std::vector<std::string> args = deps;
-  args.insert(args.end(), target.link_args.begin(), target.link_args.end());
+  const auto& link_args =
+      std::vector{target.link_args, deps::get_link_args(target.dependencies)} |
+      rv::join | r::to<std::vector>();
+
+  std::vector<std::string> args = compiled_objs;
+  args.insert(args.end(), link_args.begin(), link_args.end());
   args.emplace_back("-o");
   args.push_back((build_dir / target.name).string());
+  args.emplace_back(
+      std::format("-fprebuilt-module-path={}", build_dir.string()));
 
   boost::asio::io_context ctx;
 
@@ -90,6 +102,7 @@ export auto build_target(const fs::path& build_dir,
   if (ret != 0) {
     std::println(std::cerr, "Link failed: {} {}", kCompiler,
                  boost::algorithm::join(args, " "));
+    std::exit(1);
   }
 }
 
@@ -109,7 +122,7 @@ export auto generate_compile_commands(
   std::vector<CompileCommandsEntry> compile_commands;
   for (const auto& src : sources) {
     const auto [out, cmd] =
-        builder::get_compiler_command(build_dir, src, compiler_args);
+        builder::get_compile_command(build_dir, src, compiler_args);
 
     compile_commands.push_back(CompileCommandsEntry{
         .directory = build_dir,

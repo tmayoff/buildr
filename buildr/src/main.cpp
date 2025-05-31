@@ -9,6 +9,7 @@
 
 import config_mod;
 import build_mod;
+import dependencies_mod;
 
 namespace fs = std::filesystem;
 
@@ -72,11 +73,18 @@ void build() {
 
   const auto &default_target = project_config.targets.front();
 
+  deps::check_deps(default_target.dependencies);
+
   std::println("building: {}", default_target.name);
 
+  auto dep_compiler_args = deps::get_compile_args(default_target.dependencies);
+
+  std::vector<std::string> compile_args = dep_compiler_args;
+  compile_args.insert(compile_args.end(), default_target.compile_args.begin(),
+                      default_target.compile_args.end());
   builder::generate_compile_commands(
       project_config.build_dir, project_config.root_dir,
-      default_target.compile_args, default_target.sources);
+      compile_args, default_target.sources);
 
   builder::build_target(project_config.build_dir, default_target);
 }

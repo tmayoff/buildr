@@ -9,7 +9,7 @@
 template <typename T>
 concept DescribeableStruct =
     boost::describe::has_describe_bases<T>::value &&
-    boost::describe::has_describe_members<T>::value && !std::is_union<T>::value;
+    boost::describe::has_describe_members<T>::value && !std::is_union_v<T>;
 
 template <DescribeableStruct T>
 struct std::formatter<T, char> {
@@ -35,24 +35,24 @@ struct std::formatter<T, char> {
 
     bool first = true;
 
-    boost::mp11::mp_for_each<Bd>([&](auto D) {
+    boost::mp11::mp_for_each<Bd>([&](auto d) {
       if (!first) {
         *out++ = ',';
       }
 
       first = false;
 
-      out = std::format_to(out, " {}", (typename decltype(D)::type const&)t);
+      out = std::format_to(out, " {}", (typename decltype(d)::type const&)t);
     });
 
-    boost::mp11::mp_for_each<Md>([&](auto D) {
+    boost::mp11::mp_for_each<Md>([&](auto d) {
       if (!first) {
         *out++ = ',';
       }
 
       first = false;
 
-      out = std::format_to(out, " .{}={}", D.name, t.*D.pointer);
+      out = std::format_to(out, " .{}={}", d.name, t.*d.pointer);
     });
 
     if (!first) {

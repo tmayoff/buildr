@@ -13,4 +13,4 @@ jobs:
         run: |
           nix build -L
           cd buildr
-          nix run ../flake.nix -- build
+          nix develop --command bash -c "nix run ../flake.nix -- build"

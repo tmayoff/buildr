@@ -14,15 +14,7 @@
         pkgs = import nixpkgs {
           inherit system;
         };
-        # toml = pkgs.tomlplusplus.overrideAttrs (old: {
-        #   src = pkgs.fetchFromGitHub {
-        #     owner = "marzer";
-        #     repo = "tomlplusplus";
-        #     rev = "2f35c28a52fd0ada7600273de9aacb66550bcdcb";
-        #     hash = "sha256-iO/lxKrhKF0ILnAHyGDjXOK5ShnnV84oGTNukTLMQQ4=";
-        #   };
-        #   patches = [];
-        # });
+
       in rec {
         buildr = pkgs.llvmPackages_20.stdenv.mkDerivation {
           name = "buildr";
@@ -30,6 +22,8 @@
 
           nativeBuildInputs = with pkgs; [pkg-config];
           buildInputs = with pkgs; [
+            libpkgconf
+            pkg-config
             boost
             tomlplusplus
             nlohmann_json
@@ -52,26 +46,24 @@
         packages.default = buildr;
 
         devShell = pkgs.mkShell.override {stdenv = pkgs.llvmPackages_20.stdenv;} {
-          nativeBuildInputs = with pkgs; [
-            llvmPackages_20.clang-tools
+          nativeBuildInputs = with pkgs;
+            buildr.nativeBuildInputs
+            ++ [
+              llvmPackages_20.clang-tools
 
-            pkg-config
-            cmake
+              pkg-config
+              cmake
 
-            lldb
+              lldb
 
-            just
+              just
 
-            meson
-            muon
-            ninja
-          ];
+              meson
+              muon
+              ninja
+            ];
 
-          buildInputs = with pkgs; [
-            boost
-            tomlplusplus
-            nlohmann_json
-          ];
+          buildInputs = buildr.buildInputs;
         };
       }
     );
