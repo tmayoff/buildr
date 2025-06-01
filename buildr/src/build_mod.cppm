@@ -8,6 +8,7 @@ module;
 #include <boost/describe/class.hpp>
 #include <boost/json.hpp>
 #include <boost/process.hpp>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -28,82 +29,146 @@ constexpr auto kCompiler = "clang++";
 
 namespace fs = std::filesystem;
 namespace bp = boost::process::v2;
+namespace r = std::ranges;
+namespace rv = r::views;
+
+using error_code = int;
 
 auto get_compile_command(const fs::path& build_root, const fs::path& source,
-                          const std::vector<std::string>& extra_args) {
-  fs::path out = build_root / fs::path(source.stem().string() + ".o");
+                         const std::vector<std::string>& extra_args) {
+  const auto cpp_module = source.extension() == ".cppm";
+  const std::string out_ext = cpp_module ? ".pcm" : ".o";
+  const fs::path out = build_root / fs::path(source.stem().string() + out_ext);
 
-  std::vector<std::string> args = extra_args;
+  auto args =
+      std::vector{
+          extra_args,
+          {std::format("-fprebuilt-module-path={}", build_root.string())}} |
+      rv::join | r::to<std::vector>();
 
-  args.emplace_back(
-      std::format("-fprebuilt-module-path={}", build_root.string()));
+  if (cpp_module) args.emplace_back("--precompile");
 
-  if (source.extension() == ".cppm") {
-    out = build_root / fs::path(source.stem().string() + ".pcm");
-    args.emplace_back("--precompile");
-  }
-  const auto cmd = std::format("{} {} -g -gmodules -o {} -c {}", kCompiler,
+  const bool debug = true;
+  if (debug) args.emplace_back(cpp_module ? "-gmodules" : "-g");
+
+  const auto cmd = std::format("{} {} -o {} -c {}", kCompiler,
                                boost::algorithm::join(args, " "), out.string(),
                                source.string());
-  return std::pair(out, cmd);
+  return std::tuple(out, cmd);
+}
+
+auto check_ts(const fs::path& original_path, const fs::path& build_path) {
+  // The epoch of last_time_write is the year 2174, which means the timestamp is
+  // most likely to be negative.
+  // https://stackoverflow.com/questions/67142013/why-time-since-epoch-from-a-stdfilesystemfile-time-type-is-negative
+
+  const auto ts_file = fs::path(build_path.string() + ".ts");
+  const auto original_ts =
+      fs::last_write_time(original_path).time_since_epoch();
+
+  std::fstream f(ts_file);
+  std::stringstream ss;
+  ss << f.rdbuf();
+
+  const auto out_ts = std::stol(
+      ss.str().empty() ? std::to_string(original_ts.min().count()) : ss.str());
+
+  return original_ts.count() > out_ts;
+}
+
+auto update_ts(const fs::path& original_path, const fs::path& build_path) {
+  const auto new_ts =
+      fs::last_write_time(original_path).time_since_epoch().count();
+
+  const auto ts_file = fs::path(build_path.string() + ".ts");
+  std::ofstream f(ts_file);
+  f << new_ts;
+}
+
+auto compile_object(const fs::path& src, const std::string& cmd,
+                    const fs::path& out) -> std::expected<bool, error_code> {
+  if (check_ts(src, out)) {
+    std::println(std::cout, "{}", cmd);
+
+    const auto ret = system(cmd.c_str());
+    if (ret != 0) return std::unexpected(ret);
+
+    update_ts(src, out);
+    return true;
+  }
+
+  std::println(std::cout, "Skipping build of {}", src.string());
+  return false;
+}
+
+auto link_object(const std::vector<fs::path>& objs, const std::string& cmd,
+                 const fs::path& out) {
+  std::println(std::cout, "Linking");
+
+  const auto ret = system(cmd.c_str());
+  if (ret != 0) {
+    std::println(std::cerr, "Link failed: {}", cmd);
+    std::exit(1);
+  }
 }
 
 export auto build_target(const fs::path& build_dir,
                          const config::BuildTarget& target) {
-  namespace r = std::ranges;
-  namespace rv = r::views;
+  const auto compile_args =
+      std::vector{deps::get_compile_args(target.dependencies),
+                  target.compile_args} |
+      rv::join | r::to<std::vector>();
 
-  auto dep_compiler_args = deps::get_compile_args(target.dependencies);
-
-  std::vector<std::string> compile_args = dep_compiler_args;
-  compile_args.insert(compile_args.end(), target.compile_args.begin(),
-                      target.compile_args.end());
-
-  std::vector<std::pair<fs::path, std::string>> commands =
+  const auto commands =
       target.sources |
       rv::transform([build_dir, args = compile_args](const fs::path& source) {
-        return get_compile_command(build_dir, source, args);
+        return std::tuple_cat(std::make_tuple(source),
+                              get_compile_command(build_dir, source, args));
       }) |
       r::to<std::vector>();
 
   std::println(std::cout, "Compiling");
-  for (const auto& [out, cmd] : commands) {
-    std::println(std::cout, "{}", cmd);
-    auto ret = system(cmd.c_str());
-    if (ret != 0) {
+  bool built_obj = false;
+  for (const auto& [src, out, cmd] : commands) {
+    const auto result = compile_object(src, cmd, out);
+    if (!result.has_value()) {
       std::println(std::cerr, "Failed to build target: {}", target.name);
-      std::exit(1);
+      std::exit(result.error());
     }
-  }
 
-  std::println(std::cout, "Linking");
+    if (result.value()) built_obj = true;
+  }
 
   const auto& compiled_objs =
       commands |
-      rv::transform([](const auto& pair) { return pair.first.string(); }) |
+      rv::transform([](const auto& tuple) { return std::get<1>(tuple); }) |
       r::to<std::vector>();
 
   const auto& link_args =
       std::vector{target.link_args, deps::get_link_args(target.dependencies)} |
       rv::join | r::to<std::vector>();
 
-  std::vector<std::string> args = compiled_objs;
-  args.insert(args.end(), link_args.begin(), link_args.end());
-  args.emplace_back("-o");
-  args.push_back((build_dir / target.name).string());
-  args.emplace_back(
-      std::format("-fprebuilt-module-path={}", build_dir.string()));
+  const auto args =
+      std::vector{
+          compiled_objs | rv::transform([](const auto& path) {
+            return path.string();
+          }) | r::to<std::vector>(),
+          link_args,
+          {
+              "-o",
+              (build_dir / target.name).string(),
+              std::format("-fprebuilt-module-path={}", build_dir.string()),
+          },
+      } |
+      rv::join | r::to<std::vector>();
 
-  boost::asio::io_context ctx;
+  const auto cmd =
+      std::format("{} {}", kCompiler, boost::algorithm::join(args, " "));
 
-  auto ret =
-      system(std::format("{} {}", kCompiler, boost::algorithm::join(args, " "))
-                 .c_str());
-  if (ret != 0) {
-    std::println(std::cerr, "Link failed: {} {}", kCompiler,
-                 boost::algorithm::join(args, " "));
-    std::exit(1);
-  }
+  if (built_obj)
+    link_object(compiled_objs, cmd, build_dir / target.name);
+  else
+    std::println(std::cout, "Skipping link: {}", target.name);
 }
 
 struct CompileCommandsEntry {
