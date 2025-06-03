@@ -2,8 +2,6 @@ module;
 
 #include <boost/describe.hpp>
 #include <filesystem>
-#include <iostream>
-#include <print>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -12,6 +10,8 @@ module;
 #include <toml++/toml.hpp>
 
 export module config_mod;
+
+import logging;
 
 namespace config {
 
@@ -70,8 +70,8 @@ export auto parse_project(const fs::path& dir) {
 
   const auto result = toml::parse_file((dir / "buildr.toml").string());
   if (!result) {
-    std::println(std::cerr, "Failed to parse config file ({}): {}",
-                 (dir / "buildr.toml").string(), result.error().description());
+    log::error("Failed to parse config file ({}): {}",
+               (dir / "buildr.toml").string(), result.error().description());
   }
 
   const auto& tbl = result.table();

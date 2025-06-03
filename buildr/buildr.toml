@@ -1,5 +1,5 @@
-srcs = ["src/toml.cpp", "src/config_mod.cppm", "src/dependencies_mod.cppm", "src/build_mod.cppm", "src/main.cpp"]
-compile_args = ["-I/home/tyler/src/buildr/buildr/src", "-std=c++26"]
+srcs = ["src/logging.cppm", "src/toml.cpp", "src/config_mod.cppm", "src/dependencies_mod.cppm", "src/build_mod.cppm", "src/main.cpp"]
+compile_args = ["-Isrc", "-std=c++26"]
 link_args = []
 
 [dependencies]

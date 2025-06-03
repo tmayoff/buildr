@@ -14,7 +14,6 @@
         pkgs = import nixpkgs {
           inherit system;
         };
-
       in rec {
         buildr = pkgs.llvmPackages_20.stdenv.mkDerivation {
           name = "buildr";
@@ -50,6 +49,7 @@
             buildr.nativeBuildInputs
             ++ [
               llvmPackages_20.clang-tools
+              llvmPackages_20.libllvm
 
               pkg-config
               cmake

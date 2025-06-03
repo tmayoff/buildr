@@ -20,6 +20,7 @@ module;
 
 export module build_mod;
 
+import logging;
 import config_mod;
 import dependencies_mod;
 
@@ -88,7 +89,7 @@ auto update_ts(const fs::path& original_path, const fs::path& build_path) {
 auto compile_object(const fs::path& src, const std::string& cmd,
                     const fs::path& out) -> std::expected<bool, error_code> {
   if (check_ts(src, out)) {
-    std::println(std::cout, "{}", cmd);
+    log::debug("{}", cmd);
 
     const auto ret = system(cmd.c_str());
     if (ret != 0) return std::unexpected(ret);
@@ -97,17 +98,17 @@ auto compile_object(const fs::path& src, const std::string& cmd,
     return true;
   }
 
-  std::println(std::cout, "Skipping build of {}", src.string());
+  log::debug("Skipping build of {}", src.string());
   return false;
 }
 
 auto link_object(const std::vector<fs::path>& objs, const std::string& cmd,
                  const fs::path& out) {
-  std::println(std::cout, "Linking");
+  log::info("Linking: {}", out.string());
 
   const auto ret = system(cmd.c_str());
   if (ret != 0) {
-    std::println(std::cerr, "Link failed: {}", cmd);
+    log::error("Link failed: {}", cmd);
     std::exit(1);
   }
 }
@@ -127,12 +128,11 @@ export auto build_target(const fs::path& build_dir,
       }) |
       r::to<std::vector>();
 
-  std::println(std::cout, "Compiling");
   bool built_obj = false;
   for (const auto& [src, out, cmd] : commands) {
     const auto result = compile_object(src, cmd, out);
     if (!result.has_value()) {
-      std::println(std::cerr, "Failed to build target: {}", target.name);
+      log::error("Failed to build target: {}", target.name);
       std::exit(result.error());
     }
 
@@ -168,7 +168,7 @@ export auto build_target(const fs::path& build_dir,
   if (built_obj)
     link_object(compiled_objs, cmd, build_dir / target.name);
   else
-    std::println(std::cout, "Skipping link: {}", target.name);
+    log::debug("Skipping link: {}", target.name);
 }
 
 struct CompileCommandsEntry {

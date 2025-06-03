@@ -2,7 +2,6 @@ module;
 
 #include <libpkgconf/libpkgconf.h>
 
-#include <functional>
 #include <memory>
 #include <print>
 #include <ranges>
@@ -13,13 +12,14 @@ module;
 
 export module dependencies_mod;
 
+import logging;
 import config_mod;
 
 namespace deps {
 
 static auto error_handler(const char* message, const pkgconf_client_t*, void*)
     -> bool {
-  std::println("pkgconf error: {}", message);
+  log::error("pkgconf error: {}", message);
   return true;
 }
 
@@ -49,14 +49,14 @@ export auto check_deps(const std::vector<config::Dependency>& deps) -> bool {
   auto client = get_pkgconf_client();
 
   if (client == nullptr) {
-    std::println("failed to init pkgconf client");
+    log::error("failed to init pkgconf client");
   }
 
   for (const auto& dep : deps) {
-    std::println("Searching for dependency: {}", dep.name);
+    log::debug("Searching for dependency: {}", dep.name);
 
     auto pkg = pkgconf_pkg_find(client.get(), dep.name.c_str());
-    std::println("Found: {}", pkg != nullptr);
+    log::debug("Found: {}", pkg != nullptr);
   }
 
   return false;
@@ -72,7 +72,7 @@ export auto get_compile_args(const config::Dependency& dep)
 
   auto pkg = pkgconf_pkg_find(client.get(), dep.name.c_str());
   if (pkg == nullptr) {
-    std::println("Failed to find package: {}", dep.name);
+    log::error("Failed to find package: {}", dep.name);
     return {};
   }
 
@@ -106,7 +106,7 @@ auto get_link_args(const std::string& dep_name) -> std::vector<std::string> {
 
   auto pkg = pkgconf_pkg_find(client.get(), dep_name.c_str());
   if (pkg == nullptr) {
-    std::println("Failed to find package: {}", dep_name);
+    log::error("Failed to find package: {}", dep_name);
     return {};
   }
 

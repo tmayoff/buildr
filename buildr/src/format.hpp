@@ -11,6 +11,40 @@ concept DescribeableStruct =
     boost::describe::has_describe_bases<T>::value &&
     boost::describe::has_describe_members<T>::value && !std::is_union_v<T>;
 
+template <typename T>
+concept DescribeabelEnum = boost::describe::has_describe_enumerators<T>::value;
+
+template <DescribeabelEnum T>
+struct std::formatter<T, char> {
+ private:
+  using U = std::underlying_type_t<T>;
+
+  std::formatter<std::string_view, char> string_view_formatter_;
+  std::formatter<U, char> underlying_type_formatter_;
+
+ public:
+  constexpr auto parse(format_parse_context& ctx) {
+    auto i1 = string_view_formatter_.parse(ctx);
+    auto i2 = underlying_type_formatter_.parse(ctx);
+
+    if (i1 != i2) {
+      throw std::runtime_error("invalid format");
+    }
+
+    return i1;
+  }
+
+  auto format(const T& t, std::format_context& ctx) const {
+    const char* s = boost::describe::enum_to_string(t, 0);
+
+    if (s) {
+      return string_view_formatter_.format(s, ctx);
+    } else {
+      return underlying_type_formatter_.format(static_cast<U>(t), ctx);
+    }
+  }
+};
+
 template <DescribeableStruct T>
 struct std::formatter<T, char> {
   constexpr auto parse(format_parse_context& ctx) {
@@ -42,7 +76,7 @@ struct std::formatter<T, char> {
 
       first = false;
 
-      out = std::format_to(out, " {}", (typename decltype(d)::type const&)t);
+      out = std::format_to(out, " {}", (typename decltype(d)::type&)t);
     });
 
     boost::mp11::mp_for_each<Md>([&](auto d) {

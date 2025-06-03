@@ -7,6 +7,7 @@
 
 #include "format.hpp"
 
+import logging;
 import config_mod;
 import build_mod;
 import dependencies_mod;
@@ -60,7 +61,7 @@ auto main(int argc, char **argv) -> int {
   }
 }
 
-void print_help() { std::println("HELP"); }
+void print_help() { log::info("HELP"); }
 
 void build() {
   const auto current_dir = fs::current_path();
@@ -68,23 +69,23 @@ void build() {
 
   fs::create_directory(project_config.build_dir);
 
-  std::println("Project directory: {}", project_config.root_dir);
-  std::println("Build directory: {}", project_config.build_dir);
+  log::info("Project directory: {}", project_config.root_dir);
+  log::info("Build directory: {}", project_config.build_dir);
 
   const auto &default_target = project_config.targets.front();
 
   deps::check_deps(default_target.dependencies);
 
-  std::println("building: {}", default_target.name);
+  log::debug("building: {}", default_target.name);
 
   auto dep_compiler_args = deps::get_compile_args(default_target.dependencies);
 
   std::vector<std::string> compile_args = dep_compiler_args;
   compile_args.insert(compile_args.end(), default_target.compile_args.begin(),
                       default_target.compile_args.end());
-  builder::generate_compile_commands(
-      project_config.build_dir, project_config.root_dir,
-      compile_args, default_target.sources);
+  builder::generate_compile_commands(project_config.build_dir,
+                                     project_config.root_dir, compile_args,
+                                     default_target.sources);
 
   builder::build_target(project_config.build_dir, default_target);
 }
