@@ -1,0 +1,6 @@
+{
+  "command": "clang++ -g -DCLANG_PATH=\"/nix/store/qqylrf4bfgw6ay8jddzfj74gxzmxsz26-clang-wrapper-20.1.4/bin/clang++\" -DPKGCONFIG_PATH=\"/nix/store/2crk9xnq5x9v7yf0r2nwkgj8qsmxr4ly-pkg-config-wrapper-0.29.2/bin/pkg-config\" -DBOOTSTRAP_ONLY main.cpp -lboost_program_options -lboost_process -std=c++26 -o bootstrapped",
+  "directory": "/home/tyler/src/buildr/bootstrap",
+  "file": "main.cpp",
+  "output": "bootstrapped"
+}

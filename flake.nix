@@ -21,6 +21,7 @@
 
           nativeBuildInputs = with pkgs; [pkg-config];
           buildInputs = with pkgs; [
+            jq
             libpkgconf
             pkg-config
             boost
@@ -30,7 +31,7 @@
 
           buildPhase = ''
             cd bootstrap
-            make buildr
+            make
             cd ../buildr
             ../bootstrap/bootstrapped
           '';
