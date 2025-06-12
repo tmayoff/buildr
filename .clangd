@@ -1,0 +1,5 @@
+If:
+  PathMatch: bootstrap/.*
+
+CompileFlags:
+  CompilationDatabase: bootstrap

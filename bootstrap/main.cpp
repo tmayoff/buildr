@@ -1,4 +1,5 @@
-#include <boost/asio/io_context.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/asio.hpp>
 #include <boost/process.hpp>
 #include <boost/program_options.hpp>
 #include <filesystem>
@@ -12,8 +13,11 @@
 #include <toml++/toml.hpp>
 
 namespace fs = std::filesystem;
+namespace r = std::ranges;
+namespace rv = r::views;
 
-constexpr auto kCompiler = "clang++";
+constexpr auto kCompiler = CLANG_PATH;
+constexpr auto kPkgConfig = PKGCONFIG_PATH;
 
 struct BuildOptions {
   fs::path build_root = "build";
@@ -91,18 +95,21 @@ auto read_config(const fs::path &project_dir) -> BuildOptions {
   return opts;
 }
 
-auto run(const std::string &cmd) {
-  boost::process::ipstream stream;
-  boost::process::child proc(cmd, boost::process::std_out > stream);
+auto run(const std::string &exe, const std::vector<std::string> &args) {
+  namespace bp = boost::process;
+  boost::asio::io_context io;
+  boost::asio::readable_pipe pout(io.get_executor());
+
+  bp::process proc(io.get_executor(), exe, args,
+                   boost::process::process_stdio{.out = pout});
 
   std::string out;
-
-  std::string line;
-  while (proc.running() && stream && getline(stream, line)) {
-    out += line;
-  }
+  boost::system::error_code ec;
+  boost::asio::read(pout, boost::asio::dynamic_buffer(out), ec);
 
   proc.wait();
+
+  boost::trim(out);
   return out;
 }
 
@@ -116,19 +123,18 @@ auto get_dep_options(std::vector<std::string> deps) {
 
     if (dep == "boost") {
       dependency.compile_args.push_back(std::format(
-          "-I{}",
-          run(std::format("pkg-config --variable=includedir {}", dep))));
+          "-I{}", run(PKGCONFIG_PATH, {"--variable=includedir", dep})));
 
-      dependency.link_args.push_back(std::format(
-          "-L{}", run(std::format("pkg-config --variable=libdir {}", dep))));
+      dependency.link_args.push_back(
+          std::format("-L{}", run(PKGCONFIG_PATH, {"--variable=libdir", dep})));
       continue;
     } else if (dep.starts_with("boost_")) {
       dependency.link_args.push_back("-l" + dep);
       continue;
     }
 
-    const auto cflags = run(std::format("pkg-config --cflags {}", dep));
-    const auto libs = run(std::format("pkg-config --libs {}", dep));
+    const auto cflags = run(PKGCONFIG_PATH, {"--cflags", dep});
+    const auto libs = run(PKGCONFIG_PATH, {"--libs", dep});
     std::vector<std::string> compile_args;
     std::vector<std::string> link_args;
     boost::split(compile_args, cflags, boost::is_any_of(" "));
@@ -145,27 +151,38 @@ auto get_dep_options(std::vector<std::string> deps) {
 auto compile_source_file(fs::path build_root, fs::path source,
                          const std::vector<std::string> &extra_compile_args,
                          const std::vector<std::string> &extra_link_args) {
-  fs::path out = build_root / fs::path(source.stem().string() + ".o");
+  const auto cpp_module = source.extension() == ".cppm";
+  const std::string out_ext = cpp_module ? ".pcm" : ".o";
+  const fs::path out = build_root / fs::path(source.stem().string() + out_ext);
 
-  std::vector<std::string> args = extra_compile_args;
-
-  args.emplace_back(
-      std::format("-fprebuilt-module-path={}", build_root.string()));
+  std::vector<std::vector<std::string>> a_args = std::vector{
+      extra_compile_args,
+      {
+          std::format("-fprebuilt-module-path={}", build_root.string()),
+          "-g",
+      },
+  };
 
   if (source.extension() == ".cppm") {
-    std::println("Compiling module file");
-    out = build_root / fs::path(source.stem().string() + ".pcm");
-    args.emplace_back("--precompile");
-    args.emplace_back("-gmodules");
+    std::println("Compiling module file: {}", source.string());
+    a_args.push_back({"--precompile", "-gmodules"});
   } else {
-    std::println("Compiling cpp file");
+    a_args.push_back({"-c"});
+    std::println("Compiling cpp file: {}", source.string());
   }
 
-  const auto cmd = std::format("{} {} -g -o {} -c {}", kCompiler,
-                               boost::algorithm::join(args, " "), out.string(),
-                               source.string());
-  std::println("{}", cmd);
-  if (system(cmd.c_str()) != 0) std::exit(1);
+  a_args.push_back({
+      "-o",
+      out.string(),
+      source.string(),
+  });
+
+  const auto args = a_args | rv::join | r::to<std::vector>();
+
+  const auto cmd =
+      std::format("{} {}", kCompiler, boost::algorithm::join(args, " "));
+
+  run(kCompiler, args);
 
   return std::pair(out, cmd);
 }
@@ -176,7 +193,6 @@ void build(const BuildOptions &opts) {
   const auto &build_dir = opts.build_root;
   if (!fs::exists(build_dir)) std::filesystem::create_directory(build_dir);
 
-  const std::string compiler = "clang++";
   const std::vector<fs::path> &sources = opts.sources;
 
   const auto deps = get_dep_options(opts.dependencies);
@@ -211,19 +227,21 @@ void build(const BuildOptions &opts) {
   c.close();
 
   const std::vector<std::string> paths =
-      objs |
-      std::ranges::views::transform([](const auto &p) { return p.string(); }) |
-      std::ranges::to<std::vector>();
+      objs | rv::transform([](const auto &p) { return p.string(); }) |
+      r::to<std::vector>();
 
-  std::vector<std::string> args;
+  std::vector<std::string> args =
+      std::vector{
+          {"-fprebuilt-module-path=build"},
+          link_args,
+          paths,
+          {"-g", "-o", "build/buildr"},
+      } |
+      rv::join | r::to<std::vector>();
+
   args.emplace_back("-fprebuilt-module-path=build");
 
   std::println("LINKNING....");
-  const auto cmd =
-      std::format("{} {} {} {} -g -o build/buildr", kCompiler,
-                  boost::algorithm::join(link_args, " "),
-                  boost::algorithm::join(paths, " "), boost::join(args, " "));
-  std::println("{}", cmd);
-
-  if (system(cmd.c_str()) != 0) std::exit(1);
+  std::println("{} {}", kCompiler, boost::algorithm::join(args, " "));
+  run(kCompiler, args);
 }

@@ -14,14 +14,19 @@
         pkgs = import nixpkgs {
           inherit system;
         };
+
+        boost = pkgs.boost188;
       in rec {
         buildr = pkgs.llvmPackages_20.stdenv.mkDerivation {
           name = "buildr";
           src = ./.;
 
-          nativeBuildInputs = with pkgs; [pkg-config];
-          buildInputs = with pkgs; [
+          nativeBuildInputs = with pkgs; [
             jq
+            which
+            pkg-config
+          ];
+          buildInputs = with pkgs; [
             libpkgconf
             pkg-config
             boost

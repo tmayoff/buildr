@@ -1,14 +1,12 @@
 module;
 
-#define BOOST_PROCESS_V2_SEPARATE_COMPILATION
-#define BOOST_PROCESS_VERSION 2
+#include <unistd.h>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/describe/class.hpp>
 #include <boost/json.hpp>
 #include <boost/process.hpp>
-#include <expected>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -17,6 +15,7 @@ module;
 #include <vector>
 
 #include "format.hpp"
+#include "proc.hpp"
 
 export module build_mod;
 
@@ -29,11 +28,16 @@ namespace builder {
 constexpr auto kCompiler = "clang++";
 
 namespace fs = std::filesystem;
-namespace bp = boost::process::v2;
 namespace r = std::ranges;
 namespace rv = r::views;
 
 using error_code = int;
+
+struct CompileCommand {
+  fs::path out_file;
+  fs::path compiler;
+  std::vector<std::string> args;
+};
 
 auto get_compile_command(const fs::path& build_root, const fs::path& source,
                          const std::vector<std::string>& extra_args) {
@@ -52,10 +56,12 @@ auto get_compile_command(const fs::path& build_root, const fs::path& source,
   const bool debug = true;
   if (debug) args.emplace_back(cpp_module ? "-gmodules" : "-g");
 
-  const auto cmd = std::format("{} {} -o {} -c {}", kCompiler,
-                               boost::algorithm::join(args, " "), out.string(),
-                               source.string());
-  return std::tuple(out, cmd);
+  args.emplace_back("-o");
+  args.push_back(out.string());
+  args.emplace_back("-c");
+  args.push_back((build_root / ".." / source).string());
+
+  return CompileCommand{.out_file = out, .compiler = kCompiler, .args = args};
 }
 
 auto check_ts(const fs::path& original_path, const fs::path& build_path) {
@@ -86,22 +92,6 @@ auto update_ts(const fs::path& original_path, const fs::path& build_path) {
   f << new_ts;
 }
 
-auto compile_object(const fs::path& src, const std::string& cmd,
-                    const fs::path& out) -> std::expected<bool, error_code> {
-  if (check_ts(src, out)) {
-    log::debug("{}", cmd);
-
-    const auto ret = system(cmd.c_str());
-    if (ret != 0) return std::unexpected(ret);
-
-    update_ts(src, out);
-    return true;
-  }
-
-  log::debug("Skipping build of {}", src.string());
-  return false;
-}
-
 auto link_object(const std::vector<fs::path>& objs, const std::string& cmd,
                  const fs::path& out) {
   log::info("Linking: {}", out.string());
@@ -123,26 +113,39 @@ export auto build_target(const fs::path& build_dir,
   const auto commands =
       target.sources |
       rv::transform([build_dir, args = compile_args](const fs::path& source) {
-        return std::tuple_cat(std::make_tuple(source),
-                              get_compile_command(build_dir, source, args));
+        return std::tuple{source, get_compile_command(build_dir, source, args)};
       }) |
       r::to<std::vector>();
 
-  bool built_obj = false;
-  for (const auto& [src, out, cmd] : commands) {
-    const auto result = compile_object(src, cmd, out);
-    if (!result.has_value()) {
-      log::error("Failed to build target: {}", target.name);
-      std::exit(result.error());
-    }
+  boost::asio::io_context ctx;
 
-    if (result.value()) built_obj = true;
+  bool built_obj = false;
+  namespace bp = boost::process;
+  std::vector<bp::process> compile_processes;
+  compile_processes.reserve(commands.size());
+
+  for (const auto& [src, compile_commands] : commands) {
+    if (fs::exists(compile_commands.out_file) ||
+        check_ts(src, compile_commands.out_file)) {
+      log::debug("Compiling: {}", src);
+      auto proc = buildr::proc::run_process(ctx, compile_commands.compiler,
+                                            compile_commands.args);
+
+      built_obj = true;
+
+      const auto ret = proc.wait();
+      if (ret != 0) std::exit(ret);
+
+      update_ts(src, compile_commands.out_file);
+    } else {
+      log::debug("Skipping compiling: {}", src);
+    }
   }
 
-  const auto& compiled_objs =
-      commands |
-      rv::transform([](const auto& tuple) { return std::get<1>(tuple); }) |
-      r::to<std::vector>();
+  const auto& compiled_objs = commands | rv::transform([](const auto& tuple) {
+                                return std::get<1>(tuple).out_file;
+                              }) |
+                              r::to<std::vector>();
 
   const auto& link_args =
       std::vector{target.link_args, deps::get_link_args(target.dependencies)} |
@@ -155,19 +158,19 @@ export auto build_target(const fs::path& build_dir,
           }) | r::to<std::vector>(),
           link_args,
           {
+              std::format("-fprebuilt-module-path={}", build_dir.string()),
               "-o",
               (build_dir / target.name).string(),
-              std::format("-fprebuilt-module-path={}", build_dir.string()),
           },
       } |
       rv::join | r::to<std::vector>();
 
-  const auto cmd =
-      std::format("{} {}", kCompiler, boost::algorithm::join(args, " "));
-
-  if (built_obj)
-    link_object(compiled_objs, cmd, build_dir / target.name);
-  else
+  if (!fs::exists((build_dir / target.name)) || built_obj) {
+    log::debug("Linking: {}", target.name);
+    log::info("{} {}", kCompiler, boost::algorithm::join(args, " "));
+    auto proc = buildr::proc::run_process(ctx, kCompiler, args);
+    proc.wait();
+  } else
     log::debug("Skipping link: {}", target.name);
 }
 
@@ -186,12 +189,13 @@ export auto generate_compile_commands(
     const std::vector<fs::path>& sources) {
   std::vector<CompileCommandsEntry> compile_commands;
   for (const auto& src : sources) {
-    const auto [out, cmd] =
+    const auto [out, compiler, args] =
         builder::get_compile_command(build_dir, src, compiler_args);
 
     compile_commands.push_back(CompileCommandsEntry{
         .directory = build_dir,
-        .command = cmd,
+        .command =
+            std::format("{} {}", compiler, boost::algorithm::join(args, " ")),
         .file = root_dir / src,
         .output = out,
     });
