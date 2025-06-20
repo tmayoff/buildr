@@ -44,6 +44,7 @@
           installPhase = ''
             mkdir -p $out/bin
 
+            export BUILDR_LOG_LEVEL=debug
             cp build/buildr $out/bin
           '';
         };

@@ -3,14 +3,17 @@ module;
 #include <unistd.h>
 
 #include <boost/algorithm/string/join.hpp>
-#include <boost/asio/io_context.hpp>
+#include <boost/asio.hpp>
 #include <boost/describe/class.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/topological_sort.hpp>
 #include <boost/json.hpp>
 #include <boost/process.hpp>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <list>
 #include <ranges>
 #include <vector>
 
@@ -22,6 +25,7 @@ export module build_mod;
 import logging;
 import config_mod;
 import dependencies_mod;
+import scan_deps;
 
 namespace builder {
 
@@ -69,6 +73,15 @@ auto check_ts(const fs::path& original_path, const fs::path& build_path) {
   // most likely to be negative.
   // https://stackoverflow.com/questions/67142013/why-time-since-epoch-from-a-stdfilesystemfile-time-type-is-negative
 
+  if (!fs::exists(original_path)) {
+    throw std::runtime_error(
+        std::format("File is missing: {} {}", original_path, build_path));
+  }
+
+  if (!fs::exists(build_path)) {
+    return true;
+  }
+
   const auto ts_file = fs::path(build_path.string() + ".ts");
   const auto original_ts =
       fs::last_write_time(original_path).time_since_epoch();
@@ -103,15 +116,29 @@ auto link_object(const std::vector<fs::path>& objs, const std::string& cmd,
   }
 }
 
-export auto build_target(const fs::path& build_dir,
+export auto build_target(const scanner::graph_t& graph,
+                         const fs::path& build_dir,
                          const config::BuildTarget& target) {
   const auto compile_args =
       std::vector{deps::get_compile_args(target.dependencies),
                   target.compile_args} |
       rv::join | r::to<std::vector>();
 
+  std::list<scanner::graph_t::vertex_descriptor> sorted_vertices;
+  boost::topological_sort(graph, std::back_inserter(sorted_vertices));
+  auto sources = sorted_vertices |
+                 rv::transform([graph](const auto& v) { return graph[v]; }) |
+                 rv::filter([](const auto& p) { return fs::exists(p); }) |
+                 r::to<std::vector>();
+
+  auto cpp_sources = target.sources | rv::filter([](const auto& p) {
+                       return p.extension() == ".cpp";
+                     });
+
+  sources.insert(sources.end(), cpp_sources.begin(), cpp_sources.end());
+
   const auto commands =
-      target.sources |
+      sources |
       rv::transform([build_dir, args = compile_args](const fs::path& source) {
         return std::tuple{source, get_compile_command(build_dir, source, args)};
       }) |
@@ -134,7 +161,10 @@ export auto build_target(const fs::path& build_dir,
       built_obj = true;
 
       const auto ret = proc.wait();
-      if (ret != 0) std::exit(ret);
+      if (ret != 0) {
+        log::error("{}", proc.stderr());
+        std::exit(ret);
+      }
 
       update_ts(src, compile_commands.out_file);
     } else {
@@ -165,13 +195,13 @@ export auto build_target(const fs::path& build_dir,
       } |
       rv::join | r::to<std::vector>();
 
-  if (!fs::exists((build_dir / target.name)) || built_obj) {
-    log::debug("Linking: {}", target.name);
-    log::info("{} {}", kCompiler, boost::algorithm::join(args, " "));
-    auto proc = buildr::proc::run_process(ctx, kCompiler, args);
-    proc.wait();
-  } else
-    log::debug("Skipping link: {}", target.name);
+  log::debug("Linking: {}", target.name);
+  log::info("{} {}", kCompiler, boost::algorithm::join(args, " "));
+  auto proc = buildr::proc::run_process(ctx, kCompiler, args);
+  const auto ret = proc.wait();
+  if (ret != 0) {
+    log::error("{}", proc.stderr());
+  }
 }
 
 struct CompileCommandsEntry {

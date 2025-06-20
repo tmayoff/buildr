@@ -3,3 +3,12 @@ If:
 
 CompileFlags:
   CompilationDatabase: bootstrap
+  Add: [-std=c++26]
+---
+
+If:
+  PathMatch: buildr/.*
+
+CompileFlags:
+  CompilationDatabase: buildr/build
+  Add: [-std=c++26]

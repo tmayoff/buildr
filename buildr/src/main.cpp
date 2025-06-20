@@ -10,6 +10,7 @@ import logging;
 import config_mod;
 import build_mod;
 import dependencies_mod;
+import scan_deps;
 
 namespace fs = std::filesystem;
 
@@ -86,7 +87,13 @@ void build() {
                                      project_config.root_dir, compile_args,
                                      default_target.sources);
 
-  builder::build_target(project_config.build_dir, default_target);
+  auto graph = scanner::build_graph(project_config.build_dir);
+  if (!graph.has_value()) {
+    log::error("Failed to generate build graph");
+    std::exit(1);
+  }
+
+  builder::build_target(graph.value(), project_config.build_dir, default_target);
 }
 
 void run() {}
