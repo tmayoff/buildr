@@ -116,13 +116,20 @@ auto link_object(const std::vector<fs::path>& objs, const std::string& cmd,
   }
 }
 
+export auto get_target_compile_args(const config::BuildTarget& target) {
+  return std::vector{deps::get_compile_args(target.dependencies),
+                     target.compile_args,
+                     {target.include_dirs | rv::transform([](const auto& i) {
+                        return std::format("-I{}", i);
+                      }) |
+                      r::to<std::vector>()}} |
+         rv::join | r::to<std::vector>();
+}
+
 export auto build_target(const scanner::graph_t& graph,
                          const fs::path& build_dir,
                          const config::BuildTarget& target) {
-  const auto compile_args =
-      std::vector{deps::get_compile_args(target.dependencies),
-                  target.compile_args} |
-      rv::join | r::to<std::vector>();
+  const auto compile_args = get_target_compile_args(target);
 
   std::list<scanner::graph_t::vertex_descriptor> sorted_vertices;
   boost::topological_sort(graph, std::back_inserter(sorted_vertices));
@@ -155,6 +162,7 @@ export auto build_target(const scanner::graph_t& graph,
     if (fs::exists(compile_commands.out_file) ||
         check_ts(src, compile_commands.out_file)) {
       log::debug("Compiling: {}", src);
+      log::debug("\t{}", compile_commands.args);
       auto proc = buildr::proc::run_process(ctx, compile_commands.compiler,
                                             compile_commands.args);
 

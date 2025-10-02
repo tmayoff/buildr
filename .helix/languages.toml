@@ -1,0 +1,2 @@
+[language-server]
+clangd = { command = "clangd", args = ["--header-insertion=never", "--experimental-modules-support"]}

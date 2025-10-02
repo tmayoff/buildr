@@ -80,9 +80,8 @@ void build() {
 
   auto dep_compiler_args = deps::get_compile_args(default_target.dependencies);
 
-  std::vector<std::string> compile_args = dep_compiler_args;
-  compile_args.insert(compile_args.end(), default_target.compile_args.begin(),
-                      default_target.compile_args.end());
+  std::vector<std::string> compile_args =
+      builder::get_target_compile_args(default_target);
   builder::generate_compile_commands(project_config.build_dir,
                                      project_config.root_dir, compile_args,
                                      default_target.sources);
@@ -93,7 +92,8 @@ void build() {
     std::exit(1);
   }
 
-  builder::build_target(graph.value(), project_config.build_dir, default_target);
+  builder::build_target(graph.value(), project_config.build_dir,
+                        default_target);
 }
 
 void run() {}

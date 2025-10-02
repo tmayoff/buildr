@@ -1,8 +1,8 @@
-import clap_mod;
-
 #include <boost/describe.hpp>
 #include <filesystem>
 #include <variant>
+
+#include "clap/clap.hpp"
 
 struct BuildArgs {
   std::filesystem::path build_dir;

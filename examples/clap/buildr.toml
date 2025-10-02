@@ -1,4 +1,5 @@
-srcs = ["src/clap_mod.cppm", "src/main.cpp"]
+srcs = ["src/main.cpp"]
+include_dirs = ["include"]
 compile_args = ["-Isrc", "-std=c++26"]
 link_args = []
 

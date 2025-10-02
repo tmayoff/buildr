@@ -33,6 +33,7 @@ export struct BuildTarget {
   std::string name;
 
   std::vector<fs::path> sources;
+  std::vector<fs::path> include_dirs;
 
   std::vector<Dependency> dependencies;
 
@@ -85,6 +86,17 @@ export auto parse_project(const fs::path& dir) {
   if (tbl.contains("link_args"))
     default_target.link_args =
         get_toml_array_string(*tbl["link_args"].as_array());
+
+  if (tbl.contains("include_dirs")) {
+    default_target.include_dirs =
+        rv::all(*tbl["include_dirs"].as_array()) |
+        rv::transform([](const auto& node) -> std::optional<fs::path> {
+          return node.template value<std::string>();
+        }) |
+        rv::filter([](const auto& opt) { return opt.has_value(); }) |
+        rv::transform([](const auto& opt) { return opt.value(); }) |
+        r::to<std::vector>();
+  }
 
   if (tbl.contains("srcs")) {
     default_target.sources =
