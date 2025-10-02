@@ -1,3 +1,11 @@
+#include <boost/core/demangle.hpp>
+#include <boost/describe.hpp>
+#include <print>
+#include <ranges>
+#include <vector>
+
+#include "format.hpp"  // IWYU pragma: export
+
 namespace clap {
 
 class OptionsBuilder {};
@@ -8,12 +16,15 @@ concept DescribeableStruct =
     boost::describe::has_describe_members<T>::value && !std::is_union_v<T>;
 
 template <DescribeableStruct T>
-auto parse_args(std::ranges::input_range auto&& input_args, T& out) -> T {
-  const auto args = input_args | std::views::drop(1);
+auto parse_args(const std::vector<std::string>& input_args) -> T {
+  const auto args =
+      input_args | std::views::drop(1) | std::ranges::to<std::vector>();
 
   const auto type_name = boost::core::demangle(typeid(T).name());
 
-  std::println("Parsing arguments: {} into type: {}", args.size(), type_name);
+  std::println("Parsing arguments: {} into type: {}", args, type_name);
+
+  T out{};
 
   using describe_members =
       boost::describe::describe_members<T, boost::describe::mod_any_member>;
