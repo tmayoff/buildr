@@ -17,9 +17,9 @@
 
         boost = pkgs.boost188;
       in rec {
-        buildr = pkgs.llvmPackages_20.stdenv.mkDerivation {
-          name = "buildr";
-          src = ./.;
+        bootstrap = pkgs.llvmPackages_20.stdenv.mkDerivation {
+          name = "bootstrap";
+          src = ./bootstrap;
 
           nativeBuildInputs = with pkgs; [
             jq
@@ -35,10 +35,37 @@
           ];
 
           buildPhase = ''
-            cd bootstrap
             make
-            cd ../buildr
-            ../bootstrap/bootstrapped
+          '';
+
+          installPhase = ''
+            mkdir -p $out/bin
+
+            cp bootstrapped $out/bin
+          '';
+        };
+        buildr = pkgs.llvmPackages_20.stdenv.mkDerivation {
+          name = "buildr";
+          src = ./buildr;
+
+          nativeBuildInputs = with pkgs; [
+            jq
+            which
+            pkg-config
+          ];
+          buildInputs = with pkgs; [
+            libpkgconf
+            pkg-config
+            boost
+            tomlplusplus
+            nlohmann_json
+
+            bootstrap
+          ];
+
+          buildPhase = ''
+            bootstrapped
+            build/buildr build
           '';
 
           installPhase = ''
@@ -55,6 +82,8 @@
           nativeBuildInputs = with pkgs;
             buildr.nativeBuildInputs
             ++ [
+              bootstrap
+
               llvmPackages_20.clang-tools
               llvmPackages_20.libllvm
 
