@@ -8,7 +8,12 @@
 
 namespace clap {
 
-class OptionsBuilder {};
+class OptionsBuilder {
+ public:
+  auto add_subcommand();
+
+ private:
+};
 
 template <typename T>
 concept DescribeableStruct =

@@ -5,6 +5,7 @@
 #include <toml++/toml.hpp>
 
 #include "format.hpp"
+#include "proc.hpp"
 
 import logging;
 import config_mod;
@@ -18,8 +19,8 @@ namespace fs = std::filesystem;
 BOOST_DEFINE_ENUM_CLASS(Subcommand, unknown, help, build, run, test);
 
 void print_help();
-void build();
-void run();
+auto build() -> std::optional<fs::path>;
+void run(const fs::path &target);
 void test();
 
 auto main(int argc, char **argv) -> int {
@@ -42,19 +43,27 @@ auto main(int argc, char **argv) -> int {
   po::store(parsed, vm);
   po::notify(vm);
 
-  Subcommand subcommand = Subcommand::build;
-  // boost::describe::enum_from_string(vm.at("command").as<std::string>(),
-  //                                   subcommand);
+  Subcommand subcommand = Subcommand::help;
+  boost::describe::enum_from_string(vm.at("command").as<std::string>(),
+                                    subcommand);
 
   switch (subcommand) {
     case Subcommand::unknown:
     case Subcommand::help:
       print_help();
       std::exit(1);
+      return EXIT_SUCCESS;
     case Subcommand::build:
       build();
-    case Subcommand::run:
-      run();
+      break;
+    case Subcommand::run: {
+      const auto &target = build();
+      if (target.has_value())
+        run(*target);
+      else
+        log::error("No target built");
+      return EXIT_SUCCESS;
+    }
     case Subcommand::test:
       test();
       break;
@@ -63,7 +72,7 @@ auto main(int argc, char **argv) -> int {
 
 void print_help() { log::info("HELP"); }
 
-void build() {
+auto build() -> std::optional<fs::path> {
   const auto current_dir = fs::current_path();
   const auto &project_config = config::parse_project(current_dir);
 
@@ -94,10 +103,17 @@ void build() {
   }
 
   scanner::print_graph(graph.value());
-  builder::build_target(graph.value(), project_config.root_dir,
-                        project_config.build_dir, default_target);
+  return builder::build_target(graph.value(), project_config.root_dir,
+                               project_config.build_dir, default_target);
 }
 
-void run() {}
+void run(const fs::path &target) {
+  const auto current_dir = fs::current_path();
+  const auto &project_config = config::parse_project(current_dir);
+
+  boost::asio::io_context io;
+  log::debug("running: {}", target);
+  buildr::proc::run_process(io, target, {});
+}
 
 void test() {}

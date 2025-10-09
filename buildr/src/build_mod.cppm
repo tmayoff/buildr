@@ -142,8 +142,9 @@ export auto get_target_compile_args(const config::BuildTarget& target) {
 
 export auto build_target(const scanner::graph_t& graph, const fs::path& root,
                          const fs::path& build_root,
-                         const config::BuildTarget& target) {
-  if (boost::num_vertices(graph) == 0) return;
+                         const config::BuildTarget& target)
+    -> std::optional<fs::path> {
+  if (boost::num_vertices(graph) == 0) return std::nullopt;
 
   const auto compile_args = get_target_compile_args(target);
 
@@ -263,6 +264,8 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
 
   log::debug("All tasks completed");
 
+  const auto& final_output = build_root / target.name;
+
   const auto& link_args =
       std::vector{target.link_args, deps::get_link_args(target.dependencies)} |
       rv::join | r::to<std::vector>();
@@ -276,7 +279,7 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
           {
               std::format("-fprebuilt-module-path={}", build_root / "modules"),
               "-o",
-              (build_root / target.name).string(),
+              final_output,
           },
       } |
       rv::join | r::to<std::vector>();
@@ -288,6 +291,8 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
     log::error("{}", proc.stderr());
   } else
     log::debug("Linked");
+
+  return final_output;
 }
 
 struct CompileCommandsEntry {

@@ -16,7 +16,7 @@ struct BuildArgs {
 
 struct Args {
   int size;
-  std::variant<BuildArgs> subcommand;
+  std::variant<BuildArgs> cmd_subcommand;
 };
 
 BOOST_DESCRIBE_STRUCT(Args, (), (size));
