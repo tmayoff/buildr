@@ -1,5 +1,4 @@
 module;
-
 #include <unistd.h>
 
 #include <boost/algorithm/string/join.hpp>
@@ -9,11 +8,11 @@ module;
 #include <boost/graph/topological_sort.hpp>
 #include <boost/json.hpp>
 #include <boost/process.hpp>
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <iostream>
-#include <list>
 #include <ranges>
 #include <vector>
 
@@ -31,6 +30,7 @@ namespace builder {
 
 constexpr auto kCompiler = "clang++";
 
+using namespace std::chrono_literals;
 namespace fs = std::filesystem;
 namespace r = std::ranges;
 namespace rv = r::views;
@@ -43,16 +43,27 @@ struct CompileCommand {
   std::vector<std::string> args;
 };
 
-auto get_compile_command(const fs::path& build_root, const fs::path& source,
+export auto get_build_path(const fs::path& root, const fs::path& build_root,
+                           const fs::path& src) {
+  const auto cpp_module = src.extension() == ".cppm";
+  const std::string out_ext = cpp_module ? ".pcm" : ".o";
+
+  auto out = fs::relative(build_root, root) / (cpp_module ? "modules" / src.stem() : src);
+  out.replace_extension(out_ext);
+
+  return out;
+}
+
+auto get_compile_command(const fs::path& root, const fs::path& build_root,
+                         const fs::path& source,
                          const std::vector<std::string>& extra_args) {
   const auto cpp_module = source.extension() == ".cppm";
-  const std::string out_ext = cpp_module ? ".pcm" : ".o";
-  const fs::path out = build_root / fs::path(source.stem().string() + out_ext);
+  const auto out = get_build_path(root, build_root, source);
 
   auto args =
       std::vector{
           extra_args,
-          {std::format("-fprebuilt-module-path={}", build_root.string())}} |
+          {std::format("-fprebuilt-module-path={}", build_root / "modules")}} |
       rv::join | r::to<std::vector>();
 
   if (cpp_module) args.emplace_back("--precompile");
@@ -61,9 +72,9 @@ auto get_compile_command(const fs::path& build_root, const fs::path& source,
   if (debug) args.emplace_back(cpp_module ? "-gmodules" : "-g");
 
   args.emplace_back("-o");
-  args.push_back(out.string());
+  args.push_back(out);
   args.emplace_back("-c");
-  args.push_back((build_root / ".." / source).string());
+  args.push_back(source);
 
   return CompileCommand{.out_file = out, .compiler = kCompiler, .args = args};
 }
@@ -126,64 +137,128 @@ export auto get_target_compile_args(const config::BuildTarget& target) {
          rv::join | r::to<std::vector>();
 }
 
-export auto build_target(const scanner::graph_t& graph,
-                         const fs::path& build_dir,
+export auto build_target(const scanner::graph_t& graph, const fs::path& root,
+                         const fs::path& build_root,
                          const config::BuildTarget& target) {
+  if (boost::num_vertices(graph) == 0) return;
+
   const auto compile_args = get_target_compile_args(target);
 
-  std::list<scanner::graph_t::vertex_descriptor> sorted_vertices;
-  boost::topological_sort(graph, std::back_inserter(sorted_vertices));
-  auto sources = sorted_vertices |
-                 rv::transform([graph](const auto& v) { return graph[v]; }) |
-                 rv::filter([](const auto& p) { return fs::exists(p); }) |
-                 r::to<std::vector>();
-
-  auto cpp_sources = target.sources | rv::filter([](const auto& p) {
-                       return p.extension() == ".cpp";
-                     });
-
-  sources.insert(sources.end(), cpp_sources.begin(), cpp_sources.end());
-
-  const auto commands =
-      sources |
-      rv::transform([build_dir, args = compile_args](const fs::path& source) {
-        return std::tuple{source, get_compile_command(build_dir, source, args)};
-      }) |
-      r::to<std::vector>();
-
   boost::asio::io_context ctx;
+  const auto task_runner = [&ctx, root, build_root, compile_args](
+                               fs::path src) -> std::optional<fs::path> {
+    const auto& command =
+        get_compile_command(root, build_root, src, compile_args);
+
+    const auto& out = command.out_file;
+
+    const auto& src_abs = root / src;
+    const auto& out_abs = root / out;
+
+    if (!fs::exists(out_abs.parent_path())) {
+      fs::create_directories(out_abs.parent_path());
+    }
+
+    if (fs::exists(out_abs) && !check_ts(src_abs, out_abs)) {
+      log::debug("skipping: {}", src);
+      return out;
+    }
+
+    log::debug("Compiling: {}", src);
+    log::debug("\t{}", command.args);
+    auto proc = buildr::proc::run_process(ctx, command.compiler, command.args);
+    const auto ret = proc.wait();
+    if (ret != 0) {
+      log::error("{}", proc.stderr());
+      std::exit(1);
+    }
+
+    update_ts(src_abs, out_abs);
+
+    log::debug("Finished: {}", build_root / out);
+
+    return out;
+  };
+
+  auto compilation_graph = graph;
 
   bool built_obj = false;
-  namespace bp = boost::process;
-  std::vector<bp::process> compile_processes;
-  compile_processes.reserve(commands.size());
+  std::vector<fs::path> compiled_objs;
+  compiled_objs.reserve(boost::num_vertices(compilation_graph));
 
-  for (const auto& [src, compile_commands] : commands) {
-    if (fs::exists(compile_commands.out_file) ||
-        check_ts(src, compile_commands.out_file)) {
-      log::debug("Compiling: {}", src);
-      log::debug("\t{}", compile_commands.args);
-      auto proc = buildr::proc::run_process(ctx, compile_commands.compiler,
-                                            compile_commands.args);
+  boost::asio::thread_pool thread_pool(5);
 
-      built_obj = true;
+  // Take a task out of module_sources with 0 out degrees,
+  // and queue the task
+  using vertex_t = scanner::graph_t::vertex_descriptor;
+  struct AsyncResult {
+    fs::path src;
+    std::optional<fs::path> out;
+  };
+  std::map<fs::path, std::future<AsyncResult>> futs;
 
-      const auto ret = proc.wait();
-      if (ret != 0) {
-        log::error("{}", proc.stderr());
-        std::exit(ret);
-      }
-
-      update_ts(src, compile_commands.out_file);
-    } else {
-      log::debug("Skipping compiling: {}", src);
+  std::mutex graph_mutex;
+  const auto& find_next_task = [&compilation_graph, &graph_mutex,
+                                &futs]() -> std::optional<vertex_t> {
+    std::lock_guard l(graph_mutex);
+    for (auto v :
+         boost::make_iterator_range(boost::vertices(compilation_graph))) {
+      if (!futs.contains(compilation_graph[v]) &&
+          boost::out_degree(v, compilation_graph) == 0)
+        return v;
     }
+
+    return std::nullopt;
+  };
+
+  const auto& remove_vertex = [&](const auto& src) {
+    std::lock_guard l(graph_mutex);
+    for (const auto& v :
+         boost::make_iterator_range(boost::vertices(compilation_graph))) {
+      if (compilation_graph[v] == src) {
+        boost::clear_vertex(v, compilation_graph);
+        boost::remove_vertex(v, compilation_graph);
+        return;
+      }
+    }
+  };
+
+  while (boost::num_vertices(compilation_graph) > 0 || !futs.empty()) {
+    std::this_thread::sleep_for(250ms);
+    log::debug("tasks: {}, queued: {}", boost::num_vertices(compilation_graph),
+               futs.size());
+    scanner::print_graph(compilation_graph);
+
+    for (auto it = futs.begin(); it != futs.end();) {
+      auto& [src, f] = *it;
+      if (f.wait_for(0s) == std::future_status::ready) {
+        const auto& [src, out] = f.get();
+        if (out.has_value()) compiled_objs.push_back(*out);
+        it = futs.erase(it);
+
+        remove_vertex(src);
+      } else
+        ++it;
+    }
+
+    const auto& vertex = find_next_task();
+    if (!vertex.has_value()) continue;
+    const auto src = compilation_graph[vertex.value()];
+
+    std::promise<AsyncResult> promise;
+    futs.emplace(src, promise.get_future());
+    boost::asio::post(thread_pool, [&task_runner, src,
+                                    promise = std::move(promise)]() mutable {
+      const auto& out = task_runner(src);
+      promise.set_value({.src = src, .out = out});
+    });
   }
 
-  const auto& compiled_objs = commands | rv::transform([](const auto& tuple) {
-                                return std::get<1>(tuple).out_file;
-                              }) |
-                              r::to<std::vector>();
+  log::debug("All tasks queued");
+
+  thread_pool.wait();
+
+  log::debug("All tasks completed");
 
   const auto& link_args =
       std::vector{target.link_args, deps::get_link_args(target.dependencies)} |
@@ -196,20 +271,20 @@ export auto build_target(const scanner::graph_t& graph,
           }) | r::to<std::vector>(),
           link_args,
           {
-              std::format("-fprebuilt-module-path={}", build_dir.string()),
+              std::format("-fprebuilt-module-path={}", build_root / "modules"),
               "-o",
-              (build_dir / target.name).string(),
+              (build_root / target.name).string(),
           },
       } |
       rv::join | r::to<std::vector>();
-
   log::debug("Linking: {}", target.name);
   log::info("{} {}", kCompiler, boost::algorithm::join(args, " "));
   auto proc = buildr::proc::run_process(ctx, kCompiler, args);
   const auto ret = proc.wait();
   if (ret != 0) {
     log::error("{}", proc.stderr());
-  }
+  } else
+    log::debug("Linked");
 }
 
 struct CompileCommandsEntry {
@@ -222,24 +297,26 @@ BOOST_DESCRIBE_STRUCT(CompileCommandsEntry, (),
                       (directory, command, file, output));
 
 export auto generate_compile_commands(
-    const fs::path& build_dir, const fs::path& root_dir,
+    const fs::path& root, const fs::path& build_root,
     const std::vector<std::string>& compiler_args,
     const std::vector<fs::path>& sources) {
   std::vector<CompileCommandsEntry> compile_commands;
   for (const auto& src : sources) {
     const auto [out, compiler, args] =
-        builder::get_compile_command(build_dir, src, compiler_args);
+        builder::get_compile_command(root, build_root, src, compiler_args);
+
+    const auto b_out = builder::get_build_path(root, build_root, src);
 
     compile_commands.push_back(CompileCommandsEntry{
-        .directory = build_dir,
+        .directory = root,
         .command =
             std::format("{} {}", compiler, boost::algorithm::join(args, " ")),
-        .file = root_dir / src,
-        .output = out,
+        .file = src,
+        .output = b_out,
     });
   }
 
-  std::ofstream c(build_dir / "compile_commands.json");
+  std::ofstream c(build_root / "compile_commands.json");
   c << boost::json::value_from(compile_commands);
   c.close();
 }

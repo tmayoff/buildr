@@ -42,9 +42,9 @@ auto main(int argc, char **argv) -> int {
   po::store(parsed, vm);
   po::notify(vm);
 
-  Subcommand subcommand{};
-  boost::describe::enum_from_string(vm.at("command").as<std::string>(),
-                                    subcommand);
+  Subcommand subcommand = Subcommand::build;
+  // boost::describe::enum_from_string(vm.at("command").as<std::string>(),
+  //                                   subcommand);
 
   switch (subcommand) {
     case Subcommand::unknown:
@@ -82,18 +82,20 @@ void build() {
 
   std::vector<std::string> compile_args =
       builder::get_target_compile_args(default_target);
-  builder::generate_compile_commands(project_config.build_dir,
-                                     project_config.root_dir, compile_args,
+  builder::generate_compile_commands(project_config.root_dir,
+                                     project_config.build_dir, compile_args,
                                      default_target.sources);
 
-  auto graph = scanner::build_graph(project_config.build_dir);
+  auto graph =
+      scanner::build_graph(project_config.root_dir, project_config.build_dir);
   if (!graph.has_value()) {
     log::error("Failed to generate build graph");
     std::exit(1);
   }
 
-  builder::build_target(graph.value(), project_config.build_dir,
-                        default_target);
+  scanner::print_graph(graph.value());
+  builder::build_target(graph.value(), project_config.root_dir,
+                        project_config.build_dir, default_target);
 }
 
 void run() {}

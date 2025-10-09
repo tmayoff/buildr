@@ -5,6 +5,8 @@ module;
 #include <boost/json.hpp>
 #include <expected>
 #include <filesystem>
+#include <iostream>
+#include <print>
 #include <regex>
 
 #include "format.hpp"
@@ -16,6 +18,7 @@ import logging;
 
 namespace scanner {
 namespace fs = std::filesystem;
+namespace r = std::ranges;
 
 struct Provides {
   std::string logical_name;
@@ -34,10 +37,9 @@ struct Rule {
   fs::path primary_output;
   std::optional<std::vector<Provides>> provides;
 
-  // NOLINTNEXTLINE
-  std::optional<std::vector<Requires>> _requires_;
+  std::optional<std::vector<Requires>> required;
 };
-BOOST_DESCRIBE_STRUCT(Rule, (), (primary_output, provides, _requires_))
+BOOST_DESCRIBE_STRUCT(Rule, (), (primary_output, provides, required))
 
 struct ScanDeps {
   int revision;
@@ -46,12 +48,22 @@ struct ScanDeps {
 };
 BOOST_DESCRIBE_STRUCT(ScanDeps, (), (revision, version, rules))
 
-export using graph_t = boost::adjacency_list<boost::listS, boost::vecS,
-                                      boost::directedS, fs::path>;
+export using graph_t = boost::adjacency_list<boost::setS, boost::listS,
+                                             boost::bidirectionalS, fs::path>;
 
 enum class Error { Parse };
 
-export auto build_graph(const fs::path& build_root)
+auto get_src_path(const fs::path& root, const fs::path& build_root,
+                  const fs::path& build) {
+  const auto cpp_module = build.extension() == ".pcm";
+  const std::string src_ext = cpp_module ? ".cppm" : ".cpp";
+
+  auto out = fs::relative(build, build_root);
+  out.replace_extension(src_ext);
+  return out;
+}
+
+export auto build_graph(const fs::path& root, const fs::path& build_root)
     -> std::expected<graph_t, Error> {
   const std::string cmd =
       std::format("clang-scan-deps -format=p1689 -compilation-database {}",
@@ -72,55 +84,105 @@ export auto build_graph(const fs::path& build_root)
 
   auto out = proc.stdout();
 
+  std::println("{}", out);
+
   // Fix invalid keys
   std::regex regex("(\".*)-(.*\": )");
   out = std::regex_replace(out, regex, "$1_$2");
 
   regex = std::regex("\"requires\": ");
-  out = std::regex_replace(out, regex, "\"_requires_\": ");
+  out = std::regex_replace(out, regex, "\"required\": ");
 
   boost::system::error_code ec;
-  auto json = boost::json::parse(out, ec);
+  const auto json = boost::json::parse(out, ec);
   if (ec) {
     log::error("Failed to parse scan deps: {}", ec.message());
     return std::unexpected(Error::Parse);
   }
 
-  auto scanned = boost::json::value_to<ScanDeps>(json, ec);
+  const auto scanned = boost::json::value_to<ScanDeps>(json, ec);
   if (ec) {
     log::error("Failed to deserialize scan deps: {}", ec.message());
     return std::unexpected(Error::Parse);
   }
-  std::vector<std::pair<fs::path, fs::path>> deps;
+
+  graph_t graph;
+  std::map<fs::path, graph_t::vertex_descriptor> vertices;
+  const auto find_or_add =
+      [&](const auto& v_path) -> graph_t::vertex_descriptor {
+    if (!vertices.contains(v_path))
+      vertices.emplace(v_path, boost::add_vertex(v_path, graph));
+    return vertices.at(v_path);
+  };
 
   for (const auto& rule : scanned.rules) {
-    std::optional<fs::path> source;
+    const auto output = rule.primary_output;
+    if (output.empty()) continue;
 
-    auto provides = rule.provides.value_or(std::vector<Provides>());
+    const auto src = get_src_path(root, build_root, output);
+    // if (src.empty()) continue;
+    log::debug("found file: {} from: {}", src, output);
+
+    const auto provides =
+        rule.provides.value_or(std::vector{Provides{.source_path = src}});
     for (const auto& p : provides) {
-      source = p.source_path;
-    }
+      const auto v = find_or_add(p.source_path);
 
-    auto reqs = rule._requires_.value_or(std::vector<Requires>());
-    for (const auto& req : reqs) {
-      if (source.has_value()) {
-        deps.emplace_back(*source, req.source_path);
+      if (rule.required.has_value()) {
+        r::for_each(rule.required.value_or(std::vector<Requires>()),
+                    [&](const auto& req) {
+                      log::debug("connecting {} -> {}", p.source_path,
+                                 req.source_path);
+
+                      auto r = find_or_add(req.source_path);
+                      boost::add_edge(v, r, graph);
+                    });
       }
     }
   }
 
-  graph_t graph(scanned.rules.size());
-  std::map<fs::path, graph_t::vertex_descriptor> vertices;
-  for (const auto& [source, req] : deps) {
-    auto find_or_add = [&](const auto& v_path) -> graph_t::vertex_descriptor {
-      if (!vertices.contains(v_path))
-        vertices.emplace(v_path, boost::add_vertex(v_path, graph));
-      return vertices.at(v_path);
-    };
-
-    boost::add_edge(find_or_add(source), find_or_add(req), graph);
-  }
-
   return graph;
 }
+
+namespace color {
+constexpr auto kReset = "\033[0m";
+constexpr auto kGreen = "\033[32m";
+constexpr auto kCyan = "\033[36m";
+constexpr auto kYellow = "\033[33m";
+constexpr auto kGray = "\033[90m";
+}  // namespace color
+
+export auto print_graph(const graph_t& graph) {
+  std::string print;
+  print += std::format("\033[2J");
+
+  print += std::format("{}{}{} ({})\n", color::kCyan, "📦 Task Graph",
+                       color::kReset, boost::num_vertices(graph));
+
+  for (auto v : boost::make_iterator_range(boost::vertices(graph))) {
+    const auto indeg = boost::in_degree(v, graph);
+    const auto outdeg = boost::out_degree(v, graph);
+
+    print += std::format("{}{}{}  {}(in={}, out={}){}\n", color::kGreen, "•",
+                         color::kReset, graph[v], indeg, outdeg,
+                         outdeg > 0 ? ":" : "");
+
+    // Outgoing edges (dependencies)
+    auto edges = boost::make_iterator_range(out_edges(v, graph));
+    std::vector<std::string> targets;
+    for (auto e : edges) {
+      targets.push_back(graph[target(e, graph)]);
+    }
+
+    for (size_t i = 0; i < targets.size(); ++i) {
+      bool last = (i == targets.size() - 1);
+      print +=
+          std::format("{}  {}{} {}{}\n", color::kGray, last ? "└──" : "├──",
+                      color::kYellow, targets[i], color::kReset);
+    }
+  }
+
+  std::cout << print;
+}
+
 }  // namespace scanner

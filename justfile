@@ -1,13 +1,13 @@
 project_dir := justfile_directory()
 
-default: build
+default: build_b
 
 [no-cd]
-build:
+build_f:
     nix run -L {{project_dir}}/flake.nix# -- build
 
 [no-cd]
-build_no:
+build_b:
     {{project_dir}}/buildr/build/buildr build
 
 [no-cd]
