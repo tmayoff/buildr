@@ -1,5 +1,4 @@
 module;
-#include <unistd.h>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/asio.hpp>
@@ -18,6 +17,9 @@ module;
 
 #include "format.hpp"
 #include "proc.hpp"
+
+#define TOML_EXCEPTIONS 0
+#include <toml++/toml.hpp>
 
 export module build_mod;
 
@@ -48,7 +50,8 @@ export auto get_build_path(const fs::path& root, const fs::path& build_root,
   const auto cpp_module = src.extension() == ".cppm";
   const std::string out_ext = cpp_module ? ".pcm" : ".o";
 
-  auto out = fs::relative(build_root, root) / (cpp_module ? "modules" / src.stem() : src);
+  auto out = fs::relative(build_root, root) /
+             (cpp_module ? "modules" / src.stem() : src);
   out.replace_extension(out_ext);
 
   return out;
@@ -300,24 +303,25 @@ export auto generate_compile_commands(
     const fs::path& root, const fs::path& build_root,
     const std::vector<std::string>& compiler_args,
     const std::vector<fs::path>& sources) {
-  std::vector<CompileCommandsEntry> compile_commands;
+  toml::array compile_commands;
+
   for (const auto& src : sources) {
     const auto [out, compiler, args] =
         builder::get_compile_command(root, build_root, src, compiler_args);
 
     const auto b_out = builder::get_build_path(root, build_root, src);
 
-    compile_commands.push_back(CompileCommandsEntry{
-        .directory = root,
-        .command =
-            std::format("{} {}", compiler, boost::algorithm::join(args, " ")),
-        .file = src,
-        .output = b_out,
+    compile_commands.push_back(toml::table{
+        {"directory", root.string()},
+        {"command",
+         std::format("{} {}", compiler, boost::algorithm::join(args, " "))},
+        {"file", src.string()},
+        {"output", b_out.string()},
     });
   }
 
   std::ofstream c(build_root / "compile_commands.json");
-  c << boost::json::value_from(compile_commands);
+  c << toml::json_formatter{compile_commands};
   c.close();
 }
 

@@ -5,5 +5,4 @@ link_args = []
 [dependencies]
 boost = {modules = ["filesystem", "graph", "program_options", "process", "json"]}
 tomlplusplus = {}
-nlohmann_json = {}
 libpkgconf = {}

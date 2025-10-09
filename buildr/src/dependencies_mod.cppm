@@ -3,7 +3,6 @@ module;
 #include <libpkgconf/libpkgconf.h>
 
 #include <memory>
-#include <print>
 #include <ranges>
 #include <string>
 #include <vector>

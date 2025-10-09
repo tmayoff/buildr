@@ -31,7 +31,6 @@
             pkg-config
             boost
             tomlplusplus
-            nlohmann_json
           ];
 
           buildPhase = ''
