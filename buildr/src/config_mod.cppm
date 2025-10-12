@@ -67,49 +67,21 @@ auto get_toml_array_as(const toml::array& array) -> std::vector<T> {
          r::to<std::vector>();
 }
 
-export auto parse_workspace(const fs::path& workspace) -> BuildTarget;
-
-export auto parse_project(const fs::path& project_root) {
-  ProjectConfig config;
-
-  config.root_dir = project_root;
-  config.build_dir = project_root / "build";
-
-  BuildTarget default_target{};
-
-  const auto result = toml::parse_file((project_root / "buildr.toml").string());
-  if (!result) {
-    log::error("Failed to parse config file ({}): {}",
-               (project_root / "buildr.toml").string(),
-               result.error().description());
-  }
-
-  const auto& tbl = result.table();
-
-  if (tbl.contains("workspace")) {
-    const auto members =
-        get_toml_array_as<std::string>(
-            *(tbl["workspace"]["members"].as_array())) |
-        rv::transform([](const auto& s) { return fs::path(s); }) |
-        r::to<std::vector>();
-
-    for (const auto& member : members) {
-      config.targets.push_back(parse_workspace(project_root / member));
-    }
-  }
-
-  default_target.name = project_root.stem().string();
+export auto parse_target(const toml::table& tbl, const fs::path& workspace)
+    -> BuildTarget {
+  BuildTarget target{};
+  target.name = workspace.stem().string();
 
   if (tbl.contains("compile_args"))
-    default_target.compile_args =
+    target.compile_args =
         get_toml_array_as<std::string>(*tbl["compile_args"].as_array());
 
   if (tbl.contains("link_args"))
-    default_target.link_args =
+    target.link_args =
         get_toml_array_as<std::string>(*tbl["link_args"].as_array());
 
   if (tbl.contains("include_dirs")) {
-    default_target.include_dirs =
+    target.include_dirs =
         rv::all(*tbl["include_dirs"].as_array()) |
         rv::transform([](const auto& node) -> std::optional<fs::path> {
           return node.template value<std::string>();
@@ -120,7 +92,7 @@ export auto parse_project(const fs::path& project_root) {
   }
 
   if (tbl.contains("srcs")) {
-    default_target.sources =
+    target.sources =
         rv::all(*tbl["srcs"].as_array()) |
         rv::transform([](const auto& node) -> std::optional<fs::path> {
           return node.template value<std::string>();
@@ -144,18 +116,54 @@ export auto parse_project(const fs::path& project_root) {
         }
       }
 
-      default_target.dependencies.push_back(dep);
+      target.dependencies.push_back(dep);
     }
   }
+
+  return target;
+}
+
+export auto parse_project(const fs::path& project_root) {
+  ProjectConfig config;
+
+  config.root_dir = project_root;
+  config.build_dir = project_root / "build";
+
+  const auto result = toml::parse_file((project_root / "buildr.toml").string());
+  if (!result) {
+    log::error("Failed to parse config file ({}): {}",
+               (project_root / "buildr.toml").string(),
+               result.error().description());
+  }
+
+  const auto& tbl = result.table();
+
+  if (tbl.contains("workspace")) {
+    const auto members =
+        get_toml_array_as<std::string>(
+            *(tbl["workspace"]["members"].as_array())) |
+        rv::transform([](const auto& s) { return fs::path(s); }) |
+        r::to<std::vector>();
+
+    for (const auto& member : members) {
+      const auto result =
+          toml::parse_file((project_root / "buildr.toml").string());
+      if (!result) {
+        log::error("Failed to parse config file ({}): {}",
+                   (project_root / "buildr.toml").string(),
+                   result.error().description());
+      }
+
+      const auto& tbl = result.table();
+      config.targets.push_back(parse_target(tbl, project_root / member));
+    }
+  }
+
+  const auto default_target = parse_target(tbl, project_root);
 
   config.targets.push_back(default_target);
 
   return config;
-}
-
-export auto parse_workspace(const fs::path& workspace) -> BuildTarget {
-  auto p = parse_project(workspace);
-  return p.targets.front();
 }
 
 }  // namespace config
