@@ -16,8 +16,10 @@
         };
 
         boost = pkgs.boost188;
+
+        llvm = pkgs.llvmPackages_21;
       in rec {
-        buildr = pkgs.llvmPackages_20.stdenv.mkDerivation {
+        buildr = llvm.stdenv.mkDerivation {
           name = "buildr";
           src = ./.;
 
@@ -51,12 +53,12 @@
 
         packages.default = buildr;
 
-        devShell = pkgs.mkShell.override {stdenv = pkgs.llvmPackages_20.stdenv;} {
+        devShell = pkgs.mkShell.override {stdenv = llvm.stdenv;} {
           nativeBuildInputs = with pkgs;
             buildr.nativeBuildInputs
             ++ [
-              llvmPackages_20.clang-tools
-              llvmPackages_20.libllvm
+              llvm.clang-tools
+              llvm.libllvm
 
               pkg-config
               cmake

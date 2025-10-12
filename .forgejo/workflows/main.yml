@@ -3,12 +3,12 @@ jobs:
   build:
     runs-on: kaylee
     steps:
-      - name: install nix
-        uses: https://github.com/DeterminateSystems/nix-installer-action@main
+      # - name: install nix
+      #   uses: https://github.com/DeterminateSystems/nix-installer-action@main
 
-      - uses: https://github.com/DeterminateSystems/magic-nix-cache-action@main
-        with:
-          use-flakehub: false
+      # - uses: https://github.com/DeterminateSystems/magic-nix-cache-action@main
+      #   with:
+      #     use-flakehub: false
 
       - uses: actions/checkout@v4
     

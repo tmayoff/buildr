@@ -182,6 +182,7 @@ auto compile_source_file(fs::path build_root, fs::path source,
   const auto cmd =
       std::format("{} {}", kCompiler, boost::algorithm::join(args, " "));
 
+  std::println("{}", cmd);
   run(kCompiler, args);
 
   return std::pair(out, cmd);
