@@ -159,9 +159,10 @@ export auto parse_project(const fs::path& project_root) {
     }
   }
 
-  const auto default_target = parse_target(tbl, project_root);
-
-  config.targets.push_back(default_target);
+  if (tbl.contains("srcs")) {
+    const auto default_target = parse_target(tbl, project_root);
+    config.targets.push_back(default_target);
+  }
 
   return config;
 }
