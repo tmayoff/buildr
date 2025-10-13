@@ -144,12 +144,13 @@ auto link_object(const std::vector<fs::path>& objs, const std::string& cmd,
 }
 
 export auto get_target_compile_args(const config::BuildTarget& target) {
-  return std::vector{deps::get_compile_args(target.dependencies),
-                     target.compile_args,
-                     {target.include_dirs | rv::transform([](const auto& i) {
-                        return std::format("-I{}", i);
-                      }) |
-                      r::to<std::vector>()}} |
+  return std::vector{
+             deps::get_compile_args(target.dependencies),
+             target.compile_args,
+             {target.include_dirs | rv::transform([](const auto& i) -> auto {
+                return std::format("-I{}", i);
+              }) |
+              r::to<std::vector>()}} |
          rv::join | r::to<std::vector>();
 }
 
@@ -294,7 +295,7 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
 
   const auto args =
       std::vector{
-          compiled_objs | rv::transform([](const auto& path) {
+          compiled_objs | rv::transform([](const auto& path) -> auto {
             return path.string();
           }) | r::to<std::vector>(),
           link_args,
