@@ -45,29 +45,34 @@ struct CompileCommand {
   std::vector<std::string> args;
 };
 
+auto is_module(const fs::path& p) { return p.extension() == ".cppm"; }
+
 export auto get_build_path(const fs::path& root, const fs::path& build_root,
                            const fs::path& src) {
-  const auto cpp_module = src.extension() == ".cppm";
+  const auto cpp_module = is_module(src);
   const std::string out_ext = cpp_module ? ".pcm" : ".o";
 
-  auto out = fs::relative(build_root, root) /
-             (cpp_module ? "modules" / src.stem() : src);
-  out.replace_extension(out_ext);
+  const auto out =
+      (fs::relative(build_root, root) / src).replace_extension(out_ext);
 
   return out;
 }
 
 auto get_compile_command(const fs::path& root, const fs::path& build_root,
+                         const std::set<fs::path>& module_paths,
                          const fs::path& source,
                          const std::vector<std::string>& extra_args) {
   const auto cpp_module = source.extension() == ".cppm";
   const auto out = get_build_path(root, build_root, source);
 
+  const auto m_paths =
+      module_paths | rv::transform([build_root](const auto& p) {
+        return std::format("-fprebuilt-module-path={}", build_root / p);
+      }) |
+      r::to<std::vector>();
+
   auto args =
-      std::vector{
-          extra_args,
-          {std::format("-fprebuilt-module-path={}", build_root / "modules")}} |
-      rv::join | r::to<std::vector>();
+      std::vector{extra_args, m_paths} | rv::join | r::to<std::vector>();
 
   if (cpp_module) args.emplace_back("--precompile");
 
@@ -80,6 +85,12 @@ auto get_compile_command(const fs::path& root, const fs::path& build_root,
   args.push_back(source);
 
   return CompileCommand{.out_file = out, .compiler = kCompiler, .args = args};
+}
+
+auto get_prebuilt_module_path(const std::vector<fs::path> sources) {
+  return sources | rv::filter(is_module) |
+         rv::transform([](const auto& m) { return m.parent_path(); }) |
+         r::to<std::set>();
 }
 
 auto check_ts(const fs::path& original_path, const fs::path& build_path) {
@@ -146,12 +157,13 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
   if (boost::num_vertices(graph) == 0) return;
 
   const auto compile_args = get_target_compile_args(target);
+  const auto module_paths = get_prebuilt_module_path(target.sources);
 
   boost::asio::io_context ctx;
-  const auto task_runner = [&ctx, root, build_root, compile_args](
+  const auto task_runner = [&ctx, root, build_root, compile_args, module_paths](
                                fs::path src) -> std::optional<fs::path> {
     const auto& command =
-        get_compile_command(root, build_root, src, compile_args);
+        get_compile_command(root, build_root, module_paths, src, compile_args);
 
     const auto& out = command.out_file;
 
@@ -267,14 +279,20 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
       std::vector{target.link_args, deps::get_link_args(target.dependencies)} |
       rv::join | r::to<std::vector>();
 
+  const auto m_paths =
+      module_paths | rv::transform([build_root](const auto& p) {
+        return std::format("-fprebuilt-module-path={}", build_root / p);
+      }) |
+      r::to<std::vector>();
+
   const auto args =
       std::vector{
           compiled_objs | rv::transform([](const auto& path) {
             return path.string();
           }) | r::to<std::vector>(),
           link_args,
+          m_paths,
           {
-              std::format("-fprebuilt-module-path={}", build_root / "modules"),
               "-o",
               (build_root / target.name).string(),
           },
@@ -305,9 +323,11 @@ export auto generate_compile_commands(
     const std::vector<fs::path>& sources) {
   toml::array compile_commands;
 
+  const auto module_paths = get_prebuilt_module_path(sources);
+
   for (const auto& src : sources) {
-    const auto [out, compiler, args] =
-        builder::get_compile_command(root, build_root, src, compiler_args);
+    const auto [out, compiler, args] = builder::get_compile_command(
+        root, build_root, module_paths, src, compiler_args);
 
     const auto b_out = builder::get_build_path(root, build_root, src);
 
