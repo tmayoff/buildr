@@ -70,6 +70,7 @@ auto get_toml_array_as(const toml::array& array) -> std::vector<T> {
 export auto parse_target(const toml::table& tbl, const fs::path& workspace)
     -> BuildTarget {
   BuildTarget target{};
+  log::debug("parsing workspace: {}", workspace);
   target.name = workspace.stem().string();
 
   if (tbl.contains("compile_args"))
@@ -92,14 +93,13 @@ export auto parse_target(const toml::table& tbl, const fs::path& workspace)
   }
 
   if (tbl.contains("srcs")) {
-    target.sources =
-        rv::all(*tbl["srcs"].as_array()) |
-        rv::transform([](const auto& node) -> std::optional<fs::path> {
-          return node.template value<std::string>();
-        }) |
-        rv::filter([](const auto& opt) { return opt.has_value(); }) |
-        rv::transform([](const auto& opt) { return opt.value(); }) |
-        r::to<std::vector>();
+    target.sources = get_toml_array_as<std::string>(*tbl["srcs"].as_array()) |
+                     rv::transform([](const auto& s) {
+                       log::warn("{}", s);
+                       return fs::path(s);
+                     }) |
+                     r::to<std::vector>();
+    log::debug("sources: {}", target.sources);
   }
 
   if (tbl.contains("dependencies")) {

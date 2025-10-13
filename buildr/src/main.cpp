@@ -100,6 +100,7 @@ void build(const config::ProjectConfig& project_config) {
   deps::check_deps(default_target.dependencies);
 
   log::debug("building: {}", default_target.name);
+  log::debug("srcs: {}", default_target.sources);
 
   auto dep_compiler_args = deps::get_compile_args(default_target.dependencies);
 
