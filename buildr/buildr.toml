@@ -1,8 +1,24 @@
-srcs = ["src/logging.cppm", "src/scan_deps.cppm", "src/proc.cpp", "src/toml.cpp", "src/config_mod.cppm", "src/dependencies_mod.cppm", "src/build_mod.cppm", "src/main.cpp"]
-compile_args = ["-Isrc", "-std=c++26"]
+srcs = [
+  "src/ansi_mod.cppm",
+  "src/logging.cppm",
+  "src/scan_deps.cppm",
+  "src/proc.cpp",
+  "src/toml.cpp",
+  "src/config_mod.cppm",
+  "src/dependencies_mod.cppm",
+  "src/build_mod.cppm",
+  "src/main.cpp",
+]
+compile_args = ["-Isrc/", "-std=c++26"]
 link_args = []
 
 [dependencies]
-boost = {modules = ["filesystem", "graph", "program_options", "process", "json"]}
+boost = { modules = [
+  "filesystem",
+  "graph",
+  "program_options",
+  "process",
+  "json",
+] }
 tomlplusplus = {}
 libpkgconf = {}

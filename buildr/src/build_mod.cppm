@@ -8,6 +8,7 @@ module;
 #include <boost/json.hpp>
 #include <boost/process.hpp>
 #include <chrono>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -23,6 +24,7 @@ module;
 
 export module build_mod;
 
+import ansi_mod;
 import logging;
 import config_mod;
 import dependencies_mod;
@@ -160,8 +162,9 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
   const auto module_paths = get_prebuilt_module_path(target.sources);
 
   boost::asio::io_context ctx;
-  const auto task_runner = [&ctx, root, build_root, compile_args, module_paths](
-                               fs::path src) -> std::optional<fs::path> {
+  const auto task_runner = [&ctx, root, build_root, compile_args,
+                            module_paths](fs::path src)
+      -> std::expected<std::pair<fs::path, bool>, std::string> {
     const auto& command =
         get_compile_command(root, build_root, module_paths, src, compile_args);
 
@@ -176,23 +179,22 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
 
     if (fs::exists(out_abs) && !check_ts(src_abs, out_abs)) {
       log::debug("skipping: {}", src);
-      return out;
+      return std::pair{out, false};
     }
 
-    log::debug("Compiling: {}", src);
-    log::debug("\t{}", command.args);
-    auto proc = buildr::proc::run_process(ctx, command.compiler, command.args);
-    const auto ret = proc.wait();
-    if (ret != 0) {
-      log::error("{}", proc.stderr());
-      std::exit(1);
-    }
+    log::debug("Compiling: {}\n\targs: {} {}", src, command.compiler,
+               command.args);
+
+    const auto res =
+        buildr::proc::run_process_async(ctx, command.compiler, command.args);
 
     update_ts(src_abs, out_abs);
+    if (!res.has_value()) {
+      log::error("{}", res.error().message());
+      return std::pair{out, false};
+    }
 
-    log::debug("Finished: {}", build_root / out);
-
-    return out;
+    return std::pair{out, true};
   };
 
   auto compilation_graph = graph;
@@ -206,19 +208,15 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
   // Take a task out of module_sources with 0 out degrees,
   // and queue the task
   using vertex_t = scanner::graph_t::vertex_descriptor;
-  struct AsyncResult {
-    fs::path src;
-    std::optional<fs::path> out;
-  };
-  std::map<fs::path, std::future<AsyncResult>> futs;
+  std::unordered_set<fs::path> queued;
 
   std::mutex graph_mutex;
   const auto& find_next_task = [&compilation_graph, &graph_mutex,
-                                &futs]() -> std::optional<vertex_t> {
+                                &queued]() -> std::optional<vertex_t> {
     std::lock_guard l(graph_mutex);
     for (auto v :
          boost::make_iterator_range(boost::vertices(compilation_graph))) {
-      if (!futs.contains(compilation_graph[v]) &&
+      if (!queued.contains(compilation_graph[v]) &&
           boost::out_degree(v, compilation_graph) == 0)
         return v;
     }
@@ -226,8 +224,9 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
     return std::nullopt;
   };
 
-  const auto& remove_vertex = [&](const auto& src) {
+  const auto& task_completed = [&](const auto& src) {
     std::lock_guard l(graph_mutex);
+    queued.erase(src);
     for (const auto& v :
          boost::make_iterator_range(boost::vertices(compilation_graph))) {
       if (compilation_graph[v] == src) {
@@ -238,42 +237,50 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
     }
   };
 
-  while (boost::num_vertices(compilation_graph) > 0 || !futs.empty()) {
-    std::this_thread::sleep_for(250ms);
-    log::debug("tasks: {}, queued: {}", boost::num_vertices(compilation_graph),
-               futs.size());
-    scanner::print_graph(compilation_graph);
+  std::condition_variable cond;
+  std::optional<std::string> error;
+  while ((boost::num_vertices(compilation_graph) > 0 || !queued.empty()) &&
+         !error.has_value()) {
+    ansi::reset_line();
+    log::info("tasks: {}, queued: {}", boost::num_vertices(compilation_graph),
+              queued | r::to<std::vector>());
 
-    for (auto it = futs.begin(); it != futs.end();) {
-      auto& [src, f] = *it;
-      if (f.wait_for(0s) == std::future_status::ready) {
-        const auto& [src, out] = f.get();
-        if (out.has_value()) compiled_objs.push_back(*out);
-        it = futs.erase(it);
-
-        remove_vertex(src);
-      } else
-        ++it;
+    std::optional<vertex_t> vertex = find_next_task();
+    if (!vertex.has_value()) {
+      // No tasks available wait for one to finish
+      std::unique_lock l(graph_mutex);
+      cond.wait_for(l, 5s);  // Wake up just in case
+      continue;
     }
 
-    const auto& vertex = find_next_task();
-    if (!vertex.has_value()) continue;
+    std::lock_guard l(graph_mutex);
     const auto src = compilation_graph[vertex.value()];
+    queued.emplace(src);
 
-    std::promise<AsyncResult> promise;
-    futs.emplace(src, promise.get_future());
-    boost::asio::post(thread_pool, [&task_runner, src,
-                                    promise = std::move(promise)]() mutable {
-      const auto& out = task_runner(src);
-      promise.set_value({.src = src, .out = out});
+    boost::asio::post(thread_pool, [&, src]() {
+      const auto& result = task_runner(src);
+      task_completed(src);
+
+      if (!result.has_value()) {
+        error = result.error();
+      } else {
+        const auto [out, built] = result.value();
+        std::lock_guard l(graph_mutex);
+        built_obj = built;
+        compiled_objs.push_back(out);
+      }
+
+      cond.notify_all();
     });
   }
 
-  log::debug("All tasks queued");
+  ansi::reset_line();
+  log::info("All tasks queued");
 
   thread_pool.wait();
 
-  log::debug("All tasks completed");
+  ansi::reset_line();
+  log::info("All tasks completed");
 
   const auto& link_args =
       std::vector{target.link_args, deps::get_link_args(target.dependencies)} |
@@ -298,14 +305,23 @@ export auto build_target(const scanner::graph_t& graph, const fs::path& root,
           },
       } |
       rv::join | r::to<std::vector>();
-  log::debug("Linking: {}", target.name);
-  log::info("{} {}", kCompiler, boost::algorithm::join(args, " "));
-  auto proc = buildr::proc::run_process(ctx, kCompiler, args);
-  const auto ret = proc.wait();
-  if (ret != 0) {
-    log::error("{}", proc.stderr());
-  } else
-    log::debug("Linked");
+
+  if (built_obj) {
+    log::info("Linking: {}", target.name);
+    log::debug("{} {}", kCompiler, boost::algorithm::join(args, " "));
+    auto proc = buildr::proc::run_process(ctx, kCompiler, args);
+
+    boost::system::error_code ec;
+    const auto ret = proc.wait(ec);
+    if (ret != 0) {
+      log::error("{}", proc.stderr());
+    } else {
+      ansi::reset_line();
+      log::info("Linked");
+    }
+  }
+
+  log::info("Finished");
 }
 
 struct CompileCommandsEntry {

@@ -80,11 +80,10 @@ export auto build_graph(const fs::path& root, const fs::path& build_root)
   boost::asio::io_context ctx;
   boost::asio::readable_pipe pipe{ctx};
   auto proc = buildr::proc::run_process(ctx, kScanDepsExe, args);
-  proc.wait();
+  boost::system::error_code ec;
+  proc.wait(ec);
 
   auto out = proc.stdout();
-
-  std::println("{}", out);
 
   // Fix invalid keys
   std::regex regex("(\".*)-(.*\": )");
@@ -93,7 +92,6 @@ export auto build_graph(const fs::path& root, const fs::path& build_root)
   regex = std::regex("\"requires\": ");
   out = std::regex_replace(out, regex, "\"required\": ");
 
-  boost::system::error_code ec;
   const auto json = boost::json::parse(out, ec);
   if (ec) {
     log::error("Failed to parse scan deps: {}", ec.message());
@@ -154,7 +152,6 @@ constexpr auto kGray = "\033[90m";
 
 export auto print_graph(const graph_t& graph) {
   std::string print;
-  print += std::format("\033[2J");
 
   print += std::format("{}{}{} ({})\n", color::kCyan, "📦 Task Graph",
                        color::kReset, boost::num_vertices(graph));
@@ -183,6 +180,8 @@ export auto print_graph(const graph_t& graph) {
   }
 
   std::cout << print;
+
+  return print;
 }
 
 }  // namespace scanner

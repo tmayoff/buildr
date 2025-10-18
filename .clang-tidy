@@ -2,6 +2,8 @@
 Checks: 'cppcoreguidelines-*, modernize-*,-cppcoreguidelines-avoid-do-while,-cppcoreguidelines-avoid-magic-numbers,-cppcoreguidelines-macro-usage,-cppcoreguidelines-pro-type-vararg,readability-identifier-naming'
 FormatStyle: google
 CheckOptions:
+  - key: modernize-use-trailing-return-type.TransformLambdas
+    value: none
   - key: mist-include-cleaner.IgnoreHeaders
     value: Eigen/src/.*
   - key:             readability-identifier-naming.ClassCase

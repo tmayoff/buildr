@@ -12,4 +12,8 @@ build_b:
 
 [no-cd]
 bootstrap:
-    make -C {{project_dir}}/bootstrap &&  cd {{project_dir}}/buildr && {{project_dir}}/bootstrap/bootstrapped 
+    make -C {{project_dir}}/bootstrap
+
+[no-cd]
+build_bs: bootstrap
+    {{project_dir}}/bootstrap/bootstrapped

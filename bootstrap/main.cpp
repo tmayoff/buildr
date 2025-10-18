@@ -32,11 +32,11 @@ struct Dependency {
   std::vector<std::string> compile_args;
 };
 
-void configure(const BuildOptions &opts);
-void build(const BuildOptions &opts);
-auto read_config(const fs::path &project_dir) -> BuildOptions;
+void configure(const BuildOptions& opts);
+void build(const BuildOptions& opts);
+auto read_config(const fs::path& project_dir) -> BuildOptions;
 
-auto main(int argc, char **argv) -> int {
+auto main(int argc, char** argv) -> int {
   fs::path project_dir = fs::current_path();
 
   namespace po = boost::program_options;
@@ -57,7 +57,7 @@ auto main(int argc, char **argv) -> int {
   build(opts);
 }
 
-auto read_config(const fs::path &project_dir) -> BuildOptions {
+auto read_config(const fs::path& project_dir) -> BuildOptions {
   toml::parse_result result =
       toml::parse_file((project_dir / "buildr.toml").string());
   if (!result) {
@@ -65,37 +65,37 @@ auto read_config(const fs::path &project_dir) -> BuildOptions {
     std::exit(1);
   }
 
-  const auto &tbl = result.table();
+  const auto& tbl = result.table();
 
   BuildOptions opts{};
 
-  for (const auto &[key, val] : *tbl["dependencies"].as_table()) {
+  for (const auto& [key, val] : *tbl["dependencies"].as_table()) {
     opts.dependencies.emplace_back(key.str());
     if (key == "boost") {
       const auto node = *val.as_table();
       const auto boost_modules = *node["modules"].as_array();
-      for (const auto &mod : boost_modules) {
+      for (const auto& mod : boost_modules) {
         opts.dependencies.push_back(std::string("boost_") +
                                     mod.as_string()->value_or(""));
       }
     }
   }
 
-  for (const auto &src : *tbl["srcs"].as_array()) {
+  for (const auto& src : *tbl["srcs"].as_array()) {
     opts.sources.emplace_back(src.as_string()->value_or(""));
   }
 
-  tbl["compile_args"].as_array()->for_each([&](const auto &node) {
+  tbl["compile_args"].as_array()->for_each([&](const auto& node) {
     opts.compile_args.push_back(node.as_string()->value_or(""));
   });
-  tbl["link_args"].as_array()->for_each([&](const auto &node) {
+  tbl["link_args"].as_array()->for_each([&](const auto& node) {
     opts.link_args.push_back(node.as_string()->value_or(""));
   });
 
   return opts;
 }
 
-auto run(const std::string &exe, const std::vector<std::string> &args) {
+auto run(const std::string& exe, const std::vector<std::string>& args) {
   namespace bp = boost::process;
   boost::asio::io_context io;
   boost::asio::readable_pipe pout(io.get_executor());
@@ -118,7 +118,7 @@ auto get_dep_options(std::vector<std::string> deps) {
 
   boost::asio::io_context ctx;
 
-  for (const auto &dep : deps) {
+  for (const auto& dep : deps) {
     std::println("Looking for {}...", dep);
 
     if (dep == "boost") {
@@ -149,8 +149,8 @@ auto get_dep_options(std::vector<std::string> deps) {
 }
 
 auto compile_source_file(fs::path build_root, fs::path source,
-                         const std::vector<std::string> &extra_compile_args,
-                         const std::vector<std::string> &extra_link_args) {
+                         const std::vector<std::string>& extra_compile_args,
+                         const std::vector<std::string>& extra_link_args) {
   const auto cpp_module = source.extension() == ".cppm";
   const std::string out_ext = cpp_module ? ".pcm" : ".o";
   const fs::path out = build_root / fs::path(source.stem().string() + out_ext);
@@ -188,13 +188,13 @@ auto compile_source_file(fs::path build_root, fs::path source,
   return std::pair(out, cmd);
 }
 
-void build(const BuildOptions &opts) {
+void build(const BuildOptions& opts) {
   namespace fs = std::filesystem;
 
-  const auto &build_dir = opts.build_root;
+  const auto& build_dir = opts.build_root;
   if (!fs::exists(build_dir)) std::filesystem::create_directory(build_dir);
 
-  const std::vector<fs::path> &sources = opts.sources;
+  const std::vector<fs::path>& sources = opts.sources;
 
   const auto deps = get_dep_options(opts.dependencies);
   auto compile_args = deps.compile_args;
@@ -209,11 +209,11 @@ void build(const BuildOptions &opts) {
 
   std::vector<fs::path> objs;
   toml::array compile_db;
-  for (const auto &src : sources) {
+  for (const auto& src : sources) {
     auto [out, cmd] =
         compile_source_file(build_dir, src, compile_args, link_args);
     objs.push_back(out);
-    const auto &entry = toml::table{
+    const auto& entry = toml::table{
         {"directory", "/home/tyler/src/buildr"},
         {"command", cmd},
         {"file", src.string()},
@@ -228,7 +228,7 @@ void build(const BuildOptions &opts) {
   c.close();
 
   const std::vector<std::string> paths =
-      objs | rv::transform([](const auto &p) { return p.string(); }) |
+      objs | rv::transform([](const auto& p) { return p.string(); }) |
       r::to<std::vector>();
 
   std::vector<std::string> args =

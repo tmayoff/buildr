@@ -2,6 +2,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/process.hpp>
+#include <expected>
 #include <filesystem>
 
 namespace buildr::proc {
@@ -16,7 +17,7 @@ class Process {
         stdout_(std::move(stdout)),
         stderr_(std::move(stderr)) {}
 
-  auto wait() { return proc_.wait(); }
+  auto wait(boost::system::error_code& ec) { return proc_.wait(ec); }
 
   auto stdout() -> std::string;
   auto stderr() -> std::string;
@@ -29,5 +30,10 @@ class Process {
 
 auto run_process(boost::asio::io_context& ctx, const std::filesystem::path& cmd,
                  std::vector<std::string> args) -> Process;
+
+auto run_process_async(boost::asio::io_context& ctx,
+                       const std::filesystem::path& cmd,
+                       std::vector<std::string> args)
+    -> std::expected<void, std::error_code>;
 
 }  // namespace buildr::proc
