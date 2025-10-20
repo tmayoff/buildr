@@ -4,6 +4,7 @@ module;
 
 #include <memory>
 #include <ranges>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,7 @@ module;
 
 export module dependencies_mod;
 
+import ansi_mod;
 import logging;
 import config_mod;
 
@@ -55,14 +57,15 @@ export auto check_deps(const std::vector<config::Dependency>& deps) -> bool {
     log::debug("Searching for dependency: {}", dep.name);
 
     auto pkg = pkgconf_pkg_find(client.get(), dep.name.c_str());
-    log::debug("Found: {}", pkg != nullptr);
+    ansi::reset_line();
+    log::debug("Dependency {} found: {}", dep.name, pkg != nullptr);
   }
 
   return false;
 }
 
 export auto get_compile_args(const config::Dependency& dep)
-    -> std::vector<std::string> {
+    -> std::set<std::string> {
   auto client = get_pkgconf_client();
 
   pkgconf_client_set_flags(client.get(),
@@ -75,15 +78,14 @@ export auto get_compile_args(const config::Dependency& dep)
     return {};
   }
 
+  std::set<std::string> cflags;
+
   pkgconf_list_t list = pkg->cflags;
-
-  std::vector<std::string> cflags;
-
   std::unique_ptr<pkgconf_list_t, FragmentsDeleter> fd(&list);
   pkgconf_node_t* node = nullptr;
   PKGCONF_FOREACH_LIST_ENTRY(list.head, node) {
     auto frag = static_cast<const pkgconf_fragment_t*>(node->data);
-    cflags.push_back(std::format("-{}{}", frag->type, frag->data));
+    cflags.emplace(std::format("-{}{}", frag->type, frag->data));
   }
 
   return cflags;

@@ -116,7 +116,7 @@ void build(const config::ProjectConfig& project_config) {
     std::exit(1);
   }
 
-  // scanner::print_graph(graph.value());
+  scanner::print_graph(graph.value());
   builder::build_target(graph.value(), project_config.root_dir,
                         project_config.build_dir, default_target);
 }
@@ -129,7 +129,7 @@ void clean(const config::ProjectConfig& project_config) {
       builder::get_target_compile_args(default_target);
 
   fs::create_directory(project_config.build_dir);
-    
+
   builder::generate_compile_commands(project_config.root_dir,
                                      project_config.build_dir, compile_args,
                                      default_target.sources);

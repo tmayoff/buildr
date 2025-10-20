@@ -6,7 +6,6 @@ module;
 #include <expected>
 #include <filesystem>
 #include <iostream>
-#include <print>
 #include <regex>
 
 #include "format.hpp"
@@ -51,7 +50,7 @@ BOOST_DESCRIBE_STRUCT(ScanDeps, (), (revision, version, rules))
 export using graph_t = boost::adjacency_list<boost::setS, boost::listS,
                                              boost::bidirectionalS, fs::path>;
 
-enum class Error { Parse };
+BOOST_DEFINE_ENUM_CLASS(Error, Scan, Parse);
 
 auto get_src_path(const fs::path& root, const fs::path& build_root,
                   const fs::path& build) {
@@ -81,7 +80,11 @@ export auto build_graph(const fs::path& root, const fs::path& build_root)
   boost::asio::readable_pipe pipe{ctx};
   auto proc = buildr::proc::run_process(ctx, kScanDepsExe, args);
   boost::system::error_code ec;
-  proc.wait(ec);
+  int ret = proc.wait(ec);
+  if (ret != 0) {
+    log::error("{}", proc.stderr());
+    return std::unexpected(Error::Scan);
+  }
 
   auto out = proc.stdout();
 

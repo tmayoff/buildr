@@ -16,63 +16,108 @@
         };
 
         boost = pkgs.boost188;
-
         llvm = pkgs.llvmPackages_21;
-      in rec {
-        buildr = llvm.stdenv.mkDerivation {
-          name = "buildr";
-          src = ./.;
 
-          nativeBuildInputs = with pkgs; [
-            jq
-            which
-            pkg-config
-          ];
-          buildInputs = with pkgs; [
-            libpkgconf
-            pkg-config
-            boost
-            tomlplusplus
-          ];
+        bootstrapInputs = with pkgs; [
+          which
+          pkg-config
+          boost
+          tomlplusplus
+        ];
+
+        nativeBuildInputs = with pkgs; [
+          llvm.clang-tools
+          llvm.libllvm
+          jq
+          which
+          pkg-config
+        ];
+
+        buildInputs = with pkgs; [
+          libpkgconf
+          pkg-config
+          boost
+          tomlplusplus
+        ];
+      in rec {
+        packages.bootstrap = llvm.stdenv.mkDerivation {
+          name = "bootstrapper";
+          src = ./bootstrap;
+
+          nativeBuildInputs = bootstrapInputs;
+          buildInputs = bootstrapInputs;
 
           buildPhase = ''
-            make -C bootstrap
-
-            cd ./buildr
-            ../bootstrap/bootstrapped
-            ./build/buildr build
+            make
           '';
 
           installPhase = ''
             mkdir -p $out/bin
+            cp bootstrapped $out/bin
+            ls -la $out/bin
+          '';
+        };
 
-            export BUILDR_LOG_LEVEL=debug
+        packages.bootstrapped-buildr = llvm.stdenv.mkDerivation {
+          name = "bootstrapped-buildr";
+          src = ./buildr;
+
+          nativeBuildInputs =
+            [
+              packages.bootstrap
+            ]
+            ++ nativeBuildInputs;
+
+          buildInputs = buildInputs;
+
+          buildPhase = ''
+            ${packages.bootstrap}/bin/bootstrapped
+          '';
+
+          installPhase = ''
+            mkdir -p $out/bin
             cp build/buildr $out/bin
           '';
         };
 
-        packages.default = buildr;
+        packages.buildr = llvm.stdenv.mkDerivation {
+          name = "buildr";
+          src = ./buildr;
+
+          nativeBuildInputs =
+            [
+              packages.bootstrapped-buildr
+            ]
+            ++ nativeBuildInputs;
+
+          buildInputs = buildInputs;
+
+          buildPhase = ''
+            export BUILDR_LOG_LEVEL=debug
+            ${packages.bootstrapped-buildr}/bin/buildr build
+          '';
+
+          installPhase = ''
+            mkdir -p $out/bin
+            cp build/buildr $out/bin
+          '';
+        };
+
+        packages.default = packages.buildr;
 
         devShell = pkgs.mkShell.override {stdenv = llvm.stdenv;} {
           nativeBuildInputs = with pkgs;
-            buildr.nativeBuildInputs
+            nativeBuildInputs
             ++ [
               llvm.clang-tools
               llvm.libllvm
 
               pkg-config
-              cmake
-
               lldb
-
               just
-
-              meson
-              muon
-              ninja
             ];
 
-          buildInputs = buildr.buildInputs;
+          buildInputs = buildInputs;
         };
       }
     );
