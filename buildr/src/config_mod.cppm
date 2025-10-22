@@ -2,6 +2,7 @@ module;
 
 #include <boost/describe.hpp>
 #include <filesystem>
+#include <iostream>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -92,14 +93,11 @@ export auto parse_target(const toml::table& tbl, const fs::path& workspace)
         r::to<std::vector>();
   }
 
+  std::cout << toml::json_formatter{tbl};
   if (tbl.contains("srcs")) {
     target.sources = get_toml_array_as<std::string>(*tbl["srcs"].as_array()) |
-                     rv::transform([](const auto& s) {
-                       log::warn("{}", s);
-                       return fs::path(s);
-                     }) |
+                     rv::transform([](const auto& s) { return fs::path(s); }) |
                      r::to<std::vector>();
-    log::debug("sources: {}", target.sources);
   }
 
   if (tbl.contains("dependencies")) {
@@ -147,7 +145,7 @@ export auto parse_project(const fs::path& project_root) {
 
     for (const auto& member : members) {
       const auto result =
-          toml::parse_file((project_root / "buildr.toml").string());
+          toml::parse_file((project_root / member / "buildr.toml").string());
       if (!result) {
         log::error("Failed to parse config file ({}): {}",
                    (project_root / "buildr.toml").string(),
