@@ -158,6 +158,10 @@
             ];
 
           buildInputs = buildInputs;
+
+          shellHook = ''
+            ${pkgs.cachix}/bin/cachix use tmayoff
+          '';
         };
       }
     );
