@@ -20,16 +20,24 @@
     },
     "nixpkgs": {
       "locked": {
+<<<<<<< HEAD
         "lastModified": 1761373498,
         "narHash": "sha256-Q/uhWNvd7V7k1H1ZPMy/vkx3F8C13ZcdrKjO7Jv7v0c=",
         "owner": "nixos",
         "repo": "nixpkgs",
         "rev": "6a08e6bb4e46ff7fcbb53d409b253f6bad8a28ce",
+=======
+        "lastModified": 1756744913,
+        "narHash": "sha256-am1dsLXsCK6wplf1kpJFbosKSV9t2dwgJh6o4LvlJls=",
+        "owner": "RossComputerGuy",
+        "repo": "nixpkgs",
+        "rev": "acd183d2efb23f3877c448feec7d76bf6125b5dd",
+>>>>>>> 396a265 (use clang fork)
         "type": "github"
       },
       "original": {
-        "owner": "nixos",
-        "ref": "nixos-unstable",
+        "owner": "RossComputerGuy",
+        "ref": "feat/better-llvm",
         "repo": "nixpkgs",
         "type": "github"
       }

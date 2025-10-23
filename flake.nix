@@ -13,8 +13,36 @@
   }:
     flake-utils.lib.eachDefaultSystem (
       system: let
+        overlays = [
+          (final: prev: {
+            llvmPackages_bloomberg = prev.llvmPackages_git.overrideScope (llvmFinal: llvmPrev: {
+              llvm = llvmPrev.llvm.overrideAttrs (old: {
+                version = "21.0.0";
+                src = prev.fetchFromGitHub {
+                  owner = "bloomberg";
+                  repo = "clang-p2996";
+                  rev = "d77eff1cbd78fd065668acf93b1f5f400d39134d";
+                  hash = "sha256-Jblcv53b7/1x06BsYafbNMIEFVJ3eZ9K8yVh47G5udE=";
+                };
+
+                # Force rebuild of tblgen from same sources
+                nativeBuildInputs = old.nativeBuildInputs or [] ++ [llvmPrev.llvm-bootstrap-tblgen];
+
+                # Disable some checks for speed
+                doCheck = false;
+              });
+
+              # Clang built from same monorepo
+              clang = llvmPrev.clang.overrideAttrs (old: {
+                src = llvmFinal.llvm.src;
+                version = llvmFinal.llvm.version;
+              });
+            });
+          })
+        ];
+
         pkgs = import nixpkgs {
-          inherit system;
+          inherit system overlays;
         };
 
         boost = pkgs.boost189;
