@@ -20,16 +20,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1756744913,
-        "narHash": "sha256-am1dsLXsCK6wplf1kpJFbosKSV9t2dwgJh6o4LvlJls=",
-        "owner": "RossComputerGuy",
+        "lastModified": 1761227394,
+        "narHash": "sha256-mopZ9832NC5ducMkq5b4GHkuXCWu82ZlHI0nmS37b6s=",
+        "owner": "LunNova",
         "repo": "nixpkgs",
-        "rev": "acd183d2efb23f3877c448feec7d76bf6125b5dd",
+        "rev": "a7b9179ad0bcf37e618f6998d677a73ac32c9ae5",
         "type": "github"
       },
       "original": {
-        "owner": "RossComputerGuy",
-        "ref": "feat/better-llvm",
+        "owner": "LunNova",
+        "ref": "push-lmpqqluvqonk",
         "repo": "nixpkgs",
         "type": "github"
       }
