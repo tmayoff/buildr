@@ -2,6 +2,7 @@
   description = "Flake utils demo";
 
   inputs.nixpkgs.url = "git+https://codeberg.org/tmayoff/nixpkgs?ref=clang-p2996";
+  # inputs.nixpkgs.url = "/home/tyler/src/nixpkgs";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = {
@@ -16,7 +17,7 @@
         };
 
         boost = pkgs.boost188;
-        llvm = pkgs.llvmPackages_21;
+        llvm = pkgs.llvmPackages_git;
 
         bootstrapInputs = with pkgs; [
           which

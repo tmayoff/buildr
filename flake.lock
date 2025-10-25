@@ -20,18 +20,14 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1761227394,
-        "narHash": "sha256-mopZ9832NC5ducMkq5b4GHkuXCWu82ZlHI0nmS37b6s=",
-        "owner": "LunNova",
-        "repo": "nixpkgs",
-        "rev": "a7b9179ad0bcf37e618f6998d677a73ac32c9ae5",
-        "type": "github"
+        "lastModified": 1761365686,
+        "narHash": "sha256-58dZOkbI1jzHBCzLAcM0yR7Yp74QMYGaJfffxgzGKPk=",
+        "path": "/home/tyler/src/nixpkgs",
+        "type": "path"
       },
       "original": {
-        "owner": "LunNova",
-        "ref": "push-lmpqqluvqonk",
-        "repo": "nixpkgs",
-        "type": "github"
+        "path": "/home/tyler/src/nixpkgs",
+        "type": "path"
       }
     },
     "root": {
