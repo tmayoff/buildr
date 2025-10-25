@@ -20,18 +20,18 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1756744913,
-        "narHash": "sha256-am1dsLXsCK6wplf1kpJFbosKSV9t2dwgJh6o4LvlJls=",
-        "owner": "RossComputerGuy",
-        "repo": "nixpkgs",
-        "rev": "acd183d2efb23f3877c448feec7d76bf6125b5dd",
-        "type": "github"
+        "lastModified": 1761403927,
+        "narHash": "sha256-9fFstuS+ASCUy/GXi9BYW8GaKdpZEa78JvotcetF9Zk=",
+        "ref": "clang-p2996",
+        "rev": "bde308c4a3e08de6e486c3ce2f994465ad515e14",
+        "revCount": 883911,
+        "type": "git",
+        "url": "https://codeberg.org/tmayoff/nixpkgs"
       },
       "original": {
-        "owner": "RossComputerGuy",
-        "ref": "feat/better-llvm",
-        "repo": "nixpkgs",
-        "type": "github"
+        "ref": "clang-p2996",
+        "type": "git",
+        "url": "https://codeberg.org/tmayoff/nixpkgs"
       }
     },
     "root": {
