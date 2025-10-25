@@ -2,7 +2,7 @@
   description = "C++ build system for modules";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "git+https://codeberg.org/tmayoff/nixpkgs?ref=clang-p2996";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -13,47 +13,12 @@
   }:
     flake-utils.lib.eachDefaultSystem (
       system: let
-        overlays = [
-          (final: prev: {
-            llvmPackages_bloomberg = prev.llvmPackages_git.overrideScope (llvmFinal: llvmPrev: {
-              monorepoSrc = prev.fetchFromGitHub {
-                owner = "bloomberg";
-                repo = "clang-p2996";
-                rev = "d77eff1cbd78fd065668acf93b1f5f400d39134d";
-                hash = "sha256-Jblcv53b7/1x06BsYafbNMIEFVJ3eZ9K8yVh47G5udE=";
-              };
-
-              # llvm = llvmPrev.llvm.overrideAttrs (old: {
-                version = "22.0.0";
-              #   src = prev.fetchFromGitHub {
-              #     owner = "bloomberg";
-              #     repo = "clang-p2996";
-              #     rev = "d77eff1cbd78fd065668acf93b1f5f400d39134d";
-              #     hash = "sha256-Jblcv53b7/1x06BsYafbNMIEFVJ3eZ9K8yVh47G5udE=";
-              #   };
-
-              #   # Force rebuild of tblgen from same sources
-              #   nativeBuildInputs = old.nativeBuildInputs or [] ++ [llvmPrev.llvm-bootstrap-tblgen];
-
-              #   # Disable some checks for speed
-                doCheck = false;
-              # });
-
-              # # Clang built from same monorepo
-              # clang = llvmPrev.clang.overrideAttrs (old: {
-              #   src = llvmFinal.llvm.src;
-              #   version = llvmFinal.llvm.version;
-              # });
-            });
-          })
-        ];
-
         pkgs = import nixpkgs {
-          inherit system overlays;
+          inherit system;
         };
 
-        boost = pkgs.boost189;
-        llvm = pkgs.llvmPackages_21;
+        boost = pkgs.boost188;
+        llvm = pkgs.llvmPackages_git;
         stdenv = llvm.stdenv;
 
         bootstrapInputs = with pkgs; [
@@ -143,7 +108,7 @@
 
         packages.default = packages.buildr;
 
-        devShell = pkgs.mkShell.override {stdenv = stdenv;} {
+        devShell = pkgs.mkShell.override {stdenv = llvm.libcxxStdenv;} {
           nativeBuildInputs = with pkgs;
             nativeBuildInputs
             ++ [

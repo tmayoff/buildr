@@ -20,6 +20,7 @@
     },
     "nixpkgs": {
       "locked": {
+<<<<<<< HEAD
         "lastModified": 1762111121,
         "narHash": "sha256-4vhDuZ7OZaZmKKrnDpxLZZpGIJvAeMtK6FKLJYUtAdw=",
         "owner": "nixos",
@@ -32,6 +33,20 @@
         "ref": "nixos-unstable",
         "repo": "nixpkgs",
         "type": "github"
+=======
+        "lastModified": 1761403927,
+        "narHash": "sha256-9fFstuS+ASCUy/GXi9BYW8GaKdpZEa78JvotcetF9Zk=",
+        "ref": "clang-p2996",
+        "rev": "bde308c4a3e08de6e486c3ce2f994465ad515e14",
+        "revCount": 883911,
+        "type": "git",
+        "url": "https://codeberg.org/tmayoff/nixpkgs"
+      },
+      "original": {
+        "ref": "clang-p2996",
+        "type": "git",
+        "url": "https://codeberg.org/tmayoff/nixpkgs"
+>>>>>>> 618e5e1 (switch to forked nixpkgs)
       }
     },
     "root": {
