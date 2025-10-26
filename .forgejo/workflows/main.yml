@@ -3,19 +3,9 @@ jobs:
   build:
     runs-on: kaylee
     steps:
-      # - name: install nix
-      #   uses: https://github.com/DeterminateSystems/nix-installer-action@main
-
-      # - uses: https://github.com/DeterminateSystems/magic-nix-cache-action@main
-      #   with:
-      #     use-flakehub: false
-
       - uses: actions/checkout@v4
-
-      - run: cachix authtoken ${{ secrets.CACHIX_TOKEN }}
-    
+   
       - name: Build
         run: |
-          nix build --no-link --print-out-paths cachix push tmayoff
           cd buildr
-          nix develop --command bash -c "nix run ../flake.nix -- build"
+          nix develop --accept-flake-config --command bash -c "nix run ../flake.nix -- build"
