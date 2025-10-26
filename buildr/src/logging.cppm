@@ -1,15 +1,16 @@
 module;
 
 #include <boost/describe.hpp>
+#include <exception>
 #include <format>
 #include <iostream>
 #include <print>
 
-#include "enum.hpp"
 #include "format.hpp"  // IWYU pragma: export
 
 export module logging;
 
+import reflection_mod;
 import ansi_mod;
 
 namespace log {
@@ -23,14 +24,12 @@ enum class LogLevel {
   Fatal,
 };
 
-BOOST_DESCRIBE_ENUM(LogLevel, Trace, Debug, Info, Warn, Error, Fatal)
-
 static auto get_log_level() {
   static std::optional<LogLevel> level = std::nullopt;
   if (!level.has_value()) {
     if (getenv("BUILDR_LOG_LEVEL") != nullptr) {
       const auto l_opt =
-          enum_from_string<LogLevel>(getenv("BUILDR_LOG_LEVEL"), true);
+          string_to_enum<LogLevel>(getenv("BUILDR_LOG_LEVEL"), true);
       if (l_opt) level = l_opt.value_or(LogLevel::Info);
     } else {
       level = LogLevel::Info;

@@ -7,5 +7,6 @@ jobs:
    
       - name: Build
         run: |
+          nix build -L --no-pure-eval --accept-flake-config
           cd buildr
-          nix develop --no-pure-eval --accept-flake-config --command bash -c "nix run ../flake.nix -- build"
+          nix develop --no-pure-eval --accept-flake-config --command bash -c "just build_f"

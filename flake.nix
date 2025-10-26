@@ -1,36 +1,38 @@
 {
-  description = "buildr a C++ build system";
+  description = "Flake utils demo";
 
   inputs = {
     nixpkgs.url = "git+https://codeberg.org/tmayoff/nixpkgs?ref=clang-p2996";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    devenv.url = "github:cachix/devenv";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = inputs @ {flake-parts, ...}:
-    flake-parts.lib.mkFlake {inherit inputs;} (top @ {
-      config,
-      withSystem,
-      moduleWithSystem,
-      ...
-    }: {
-      imports = [
-        inputs.devenv.flakeModule
-      ];
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+  }:
+    flake-utils.lib.eachDefaultSystem (
+      system: let
+        overlays = [
+          (final: prev: {
+            boost189 = prev.boost189.override {
+              stdenv = prev.llvmPackages_git.libcxxStdenv;
+            };
 
-      flake = {
-        # Put your original flake attributes here.
-      };
+            # tomlplusplus = prev.tomlplusplus.overrideAttrs {
+            #   stdenv = prev.llvmPackages_git.libcxxStdenv;
+            #   # doCheck = false;
+            # };
+          })
+        ];
 
-      systems = ["x86_64-linux"];
+        pkgs = import nixpkgs {
+          inherit system overlays;
+        };
 
-      perSystem = {
-        config,
-        pkgs,
-        ...
-      }: let
         boost = pkgs.boost189;
         llvm = pkgs.llvmPackages_git;
+        stdenv = llvm.libcxxStdenv;
 
         bootstrapInputs = with pkgs; [
           which
@@ -54,7 +56,7 @@
           tomlplusplus
         ];
       in rec {
-        packages.bootstrap = llvm.stdenv.mkDerivation {
+        packages.bootstrap = stdenv.mkDerivation {
           name = "bootstrapper";
           src = ./bootstrap;
 
@@ -72,7 +74,7 @@
           '';
         };
 
-        packages.bootstrapped-buildr = llvm.stdenv.mkDerivation {
+        packages.bootstrapped-buildr = stdenv.mkDerivation {
           name = "bootstrapped-buildr";
           src = ./buildr;
 
@@ -94,7 +96,7 @@
           '';
         };
 
-        packages.buildr = llvm.stdenv.mkDerivation {
+        packages.buildr = stdenv.mkDerivation {
           name = "buildr";
           src = ./buildr;
 
@@ -119,15 +121,10 @@
 
         packages.default = packages.buildr;
 
-        devenv.shells.default = {
-          cachix.enable = true;
-          cachix.pull = ["tmayoff"];
-          cachix.push = ["tmayoff"];
-
-          stdenv = llvm.libcxxStdenv;
-
-          packages = with pkgs;
-            [
+        devShell = pkgs.mkShell.override {stdenv = stdenv;} {
+          nativeBuildInputs = with pkgs;
+            nativeBuildInputs
+            ++ [
               llvm.clang-tools
               llvm.libllvm
 
@@ -142,21 +139,6 @@
             ${pkgs.cachix}/bin/cachix use tmayoff
           '';
         };
-
-        # devShell = pkgs.mkShell.override {stdenv = llvm.libcxxStdenv;} {
-        #   nativeBuildInputs = with pkgs;
-        #     nativeBuildInputs
-        #     ++ [
-        #       llvm.clang-tools
-        #       llvm.libllvm
-
-        #       pkg-config
-        #       lldb
-        #       just
-        #     ];
-
-        #   buildInputs = buildInputs;
-        # };
-      };
-    });
+      }
+    );
 }

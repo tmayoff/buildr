@@ -1,5 +1,5 @@
 srcs = [
-  "src/reflection.cppm",
+  "src/reflection_mod.cppm",
   "src/ansi_mod.cppm",
   "src/logging.cppm",
   "src/scan_deps.cppm",
@@ -10,7 +10,14 @@ srcs = [
   "src/build_mod.cppm",
   "src/main.cpp",
 ]
-compile_args = ["-Isrc/", "-freflection", "-freflection-latest", "-stdlib=libc++", "-std=c++26"]
+compile_args = [
+  "-I/nix/store/pqn000jhqcaf0qr3jjyvclva2l3f34qg-libcxx-21.0.0-p2996-dev/include/c++/v1",
+  "-Isrc/",
+  "-freflection",
+  "-freflection-latest",
+  "-stdlib=libc++",
+  "-std=c++26",
+]
 link_args = []
 
 [dependencies]
