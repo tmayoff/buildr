@@ -1,22 +1,35 @@
 {
-  description = "Flake utils demo";
+  description = "buildr a C++ build system";
 
-  inputs.nixpkgs.url = "git+https://codeberg.org/tmayoff/nixpkgs?ref=clang-p2996";
-  # inputs.nixpkgs.url = "/home/tyler/src/nixpkgs";
-  inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs = {
+    nixpkgs.url = "git+https://codeberg.org/tmayoff/nixpkgs?ref=clang-p2996";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    devenv.url = "github:cachix/devenv";
+  };
 
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-  }:
-    flake-utils.lib.eachDefaultSystem (
-      system: let
-        pkgs = import nixpkgs {
-          inherit system;
-        };
+  outputs = inputs @ {flake-parts, ...}:
+    flake-parts.lib.mkFlake {inherit inputs;} (top @ {
+      config,
+      withSystem,
+      moduleWithSystem,
+      ...
+    }: {
+      imports = [
+        inputs.devenv.flakeModule
+      ];
 
-        boost = pkgs.boost188;
+      flake = {
+        # Put your original flake attributes here.
+      };
+
+      systems = ["x86_64-linux"];
+
+      perSystem = {
+        config,
+        pkgs,
+        ...
+      }: let
+        boost = pkgs.boost189;
         llvm = pkgs.llvmPackages_git;
 
         bootstrapInputs = with pkgs; [
@@ -106,10 +119,15 @@
 
         packages.default = packages.buildr;
 
-        devShell = pkgs.mkShell.override {stdenv = llvm.libcxxStdenv;} {
-          nativeBuildInputs = with pkgs;
-            nativeBuildInputs
-            ++ [
+        devenv.shells.default = {
+          cachix.enable = true;
+          cachix.pull = ["tmayoff"];
+          cachix.push = ["tmayoff"];
+
+          stdenv = llvm.libcxxStdenv;
+
+          packages = with pkgs;
+            [
               llvm.clang-tools
               llvm.libllvm
 
@@ -124,6 +142,21 @@
             ${pkgs.cachix}/bin/cachix use tmayoff
           '';
         };
-      }
-    );
+
+        # devShell = pkgs.mkShell.override {stdenv = llvm.libcxxStdenv;} {
+        #   nativeBuildInputs = with pkgs;
+        #     nativeBuildInputs
+        #     ++ [
+        #       llvm.clang-tools
+        #       llvm.libllvm
+
+        #       pkg-config
+        #       lldb
+        #       just
+        #     ];
+
+        #   buildInputs = buildInputs;
+        # };
+      };
+    });
 }
