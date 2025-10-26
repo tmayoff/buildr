@@ -1,6 +1,6 @@
 [
   {
-    "command": "/nix/store/al7l1c2nwk9c9cicp3l7jfjxi1vilp93-clang-wrapper-21.1.2/bin/clang++ -g -DCLANG_PATH=\\\"/nix/store/al7l1c2nwk9c9cicp3l7jfjxi1vilp93-clang-wrapper-21.1.2/bin/clang++\\\" -DPKGCONFIG_PATH=\\\"/nix/store/0skggkamysbh0ksc3582lb69wzrpabcg-pkg-config-wrapper-0.29.2/bin/pkg-config\\\" -DBOOTSTRAP_ONLY -lboost_program_options -lboost_process -std=c++26 main.cpp -o bootstrapped",
+    "command": "/nix/store/9yqpg633hh567xk4dmvbs5yjvp7ij7j4-clang-wrapper-21.0.0-p2996/bin/clang++ -g -DCLANG_PATH=\\\"/nix/store/9yqpg633hh567xk4dmvbs5yjvp7ij7j4-clang-wrapper-21.0.0-p2996/bin/clang++\\\" -DPKGCONFIG_PATH=\\\"/nix/store/0skggkamysbh0ksc3582lb69wzrpabcg-pkg-config-wrapper-0.29.2/bin/pkg-config\\\" -I/nix/store/ffpwxnnj3pppv5zwrsanxg8h280403ly-boost-1.89.0-dev/include -L/nix/store/92zkb96r3n7kqp9qvx1d54sf877z27rb-boost-1.89.0/lib -DBOOTSTRAP_ONLY -lboost_program_options -lboost_process -std=c++26 main.cpp -o bootstrapped",
     "directory": "/home/tyler/src/buildr/bootstrap/",
     "file": "main.cpp",
     "output": "bootstrapped"
