@@ -18,11 +18,6 @@
             boost189 = prev.boost189.override {
               stdenv = prev.llvmPackages_git.libcxxStdenv;
             };
-
-            # tomlplusplus = prev.tomlplusplus.overrideAttrs {
-            #   stdenv = prev.llvmPackages_git.libcxxStdenv;
-            #   # doCheck = false;
-            # };
           })
         ];
 
