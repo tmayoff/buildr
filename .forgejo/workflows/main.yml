@@ -4,6 +4,10 @@ jobs:
     runs-on: kaylee
     steps:
       - uses: actions/checkout@v4
+
+      - uses: https://github.com/DeterminateSystems/nix-installer-action@v20
+        with:
+          flakehub: false
    
       - name: Build
         run: |
