@@ -2,7 +2,7 @@
   description = "Flake utils demo";
 
   inputs = {
-    nixpkgs.url = "git+https://codeberg.org/tmayoff/nixpkgs?ref=clang-p2996";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -13,21 +13,13 @@
   }:
     flake-utils.lib.eachDefaultSystem (
       system: let
-        overlays = [
-          (final: prev: {
-            boost189 = prev.boost189.override {
-              stdenv = prev.llvmPackages_git.libcxxStdenv;
-            };
-          })
-        ];
-
         pkgs = import nixpkgs {
-          inherit system overlays;
+          inherit system;
         };
 
         boost = pkgs.boost189;
-        llvm = pkgs.llvmPackages_git;
-        stdenv = llvm.libcxxStdenv;
+        llvm = pkgs.llvmPackages_21;
+        stdenv = llvm.stdenv;
 
         bootstrapInputs = with pkgs; [
           which
