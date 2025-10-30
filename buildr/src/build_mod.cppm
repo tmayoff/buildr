@@ -118,9 +118,7 @@ auto check_ts(const fs::path& original_path, const fs::path& build_path) {
   ss << f.rdbuf();
 
   const auto out_ts = std::stol(
-      ss.str().empty()
-          ? std::to_string(static_cast<int64_t>(original_ts.min().count()))
-          : ss.str());
+      ss.str().empty() ? std::to_string(original_ts.min().count()) : ss.str());
 
   return original_ts.count() > out_ts;
 }
@@ -131,7 +129,7 @@ auto update_ts(const fs::path& original_path, const fs::path& build_path) {
 
   const auto ts_file = fs::path(build_path.string() + ".ts");
   std::ofstream f(ts_file);
-  f << static_cast<int64_t>(new_ts);
+  f << new_ts;
 }
 
 auto link_object(const std::vector<fs::path>& objs, const std::string& cmd,

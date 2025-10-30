@@ -7,7 +7,7 @@
 
 #include "concepts.hpp"
 
-template <DescribeabelEnum E>
+template <DescribeableEnum E>
 inline auto enum_from_string(const std::string& name,
                              bool case_insensitive = false)
     -> std::optional<E> {

@@ -8,10 +8,7 @@
 
 #include "concepts.hpp"
 
-template <typename T>
-concept IsEnum = std::is_enum_v<T>;
-
-template <IsEnum T>
+template <DescribeableEnum T>
 struct std::formatter<T, char> {
  private:
   using U = std::underlying_type_t<T>;

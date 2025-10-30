@@ -6,11 +6,7 @@ PKG_CONFIG:=$(shell which pkg-config)
 
 CPP_STD:=c++26
 
-BOOST_LIB_DIR=$(shell pkg-config --variable=libdir boost)
-BOOST_INC_DIR=$(shell pkg-config --variable=includedir boost)
-
-
-COMMAND=${COMPILER} -g -DCLANG_PATH=\"${COMPILER}\" -DPKGCONFIG_PATH=\"${PKG_CONFIG}\" -I${BOOST_INC_DIR} -L${BOOST_LIB_DIR} -DBOOTSTRAP_ONLY -lboost_program_options -lboost_process -std=${CPP_STD} main.cpp -o bootstrapped
+COMMAND=${COMPILER} -g -DCLANG_PATH=\"${COMPILER}\" -DPKGCONFIG_PATH=\"${PKG_CONFIG}\" -DBOOTSTRAP_ONLY -lboost_program_options -lboost_process -std=${CPP_STD} main.cpp -o bootstrapped
 
 bootstrapped: main.cpp compile_commands.json
 	${COMMAND}

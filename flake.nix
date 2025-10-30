@@ -1,5 +1,5 @@
 {
-  description = "Flake utils demo";
+  description = "C++ build system for modules";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
