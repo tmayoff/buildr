@@ -3,17 +3,14 @@ jobs:
   build:
     runs-on: kaylee
     steps:
-      # - name: install nix
-      #   uses: https://github.com/DeterminateSystems/nix-installer-action@main
-
-      # - uses: https://github.com/DeterminateSystems/magic-nix-cache-action@main
-      #   with:
-      #     use-flakehub: false
-
       - uses: actions/checkout@v4
-    
+
+      - uses: https://github.com/DeterminateSystems/nix-installer-action@v20
+        with:
+          flakehub: false
+   
       - name: Build
         run: |
-          nix build -L
+          nix build -L --no-pure-eval --accept-flake-config
           cd buildr
-          nix develop --command bash -c "nix run ../flake.nix -- build"
+          nix develop --no-pure-eval --accept-flake-config --command bash -c "just build_f"

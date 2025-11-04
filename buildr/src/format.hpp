@@ -8,7 +8,7 @@
 
 #include "concepts.hpp"
 
-template <DescribeabelEnum T>
+template <DescribeableEnum T>
 struct std::formatter<T, char> {
  private:
   using U = std::underlying_type_t<T>;

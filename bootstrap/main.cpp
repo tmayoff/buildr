@@ -107,7 +107,11 @@ auto run(const std::string& exe, const std::vector<std::string>& args) {
   boost::system::error_code ec;
   boost::asio::read(pout, boost::asio::dynamic_buffer(out), ec);
 
-  proc.wait();
+  int ret = proc.wait();
+  if (ret != 0) {
+    std::println("Error building");
+    std::exit(ret);
+  }
 
   boost::trim(out);
   return out;

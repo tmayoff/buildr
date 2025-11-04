@@ -4,7 +4,7 @@ default: build_b
 
 [no-cd]
 build_f:
-    nix run -L {{project_dir}}/flake.nix# -- build
+    nix run -L {{project_dir}}# -- build
 
 [no-cd]
 build_b:

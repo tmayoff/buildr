@@ -6,7 +6,7 @@ PKG_CONFIG:=$(shell which pkg-config)
 
 CPP_STD:=c++26
 
-COMMAND=${COMPILER} -g -DCLANG_PATH=\"${COMPILER}\" -DPKGCONFIG_PATH=\"${PKG_CONFIG}\" -DBOOTSTRAP_ONLY main.cpp -lboost_program_options -lboost_process -std=${CPP_STD} -o bootstrapped
+COMMAND=${COMPILER} -g -DCLANG_PATH=\"${COMPILER}\" -DPKGCONFIG_PATH=\"${PKG_CONFIG}\" -DBOOTSTRAP_ONLY -lboost_program_options -lboost_process -std=${CPP_STD} main.cpp -o bootstrapped
 
 bootstrapped: main.cpp compile_commands.json
 	${COMMAND}

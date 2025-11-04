@@ -1,8 +1,10 @@
 {
-  description = "Flake utils demo";
+  description = "C++ build system for modules";
 
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-  inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
 
   outputs = {
     self,
@@ -15,8 +17,9 @@
           inherit system;
         };
 
-        boost = pkgs.boost188;
+        boost = pkgs.boost189;
         llvm = pkgs.llvmPackages_21;
+        stdenv = llvm.stdenv;
 
         bootstrapInputs = with pkgs; [
           which
@@ -40,7 +43,7 @@
           tomlplusplus
         ];
       in rec {
-        packages.bootstrap = llvm.stdenv.mkDerivation {
+        packages.bootstrap = stdenv.mkDerivation {
           name = "bootstrapper";
           src = ./bootstrap;
 
@@ -58,7 +61,7 @@
           '';
         };
 
-        packages.bootstrapped-buildr = llvm.stdenv.mkDerivation {
+        packages.bootstrapped-buildr = stdenv.mkDerivation {
           name = "bootstrapped-buildr";
           src = ./buildr;
 
@@ -80,7 +83,7 @@
           '';
         };
 
-        packages.buildr = llvm.stdenv.mkDerivation {
+        packages.buildr = stdenv.mkDerivation {
           name = "buildr";
           src = ./buildr;
 
@@ -105,7 +108,7 @@
 
         packages.default = packages.buildr;
 
-        devShell = pkgs.mkShell.override {stdenv = llvm.stdenv;} {
+        devShell = pkgs.mkShell.override {stdenv = stdenv;} {
           nativeBuildInputs = with pkgs;
             nativeBuildInputs
             ++ [
@@ -118,6 +121,10 @@
             ];
 
           buildInputs = buildInputs;
+
+          shellHook = ''
+            ${pkgs.cachix}/bin/cachix use tmayoff
+          '';
         };
       }
     );

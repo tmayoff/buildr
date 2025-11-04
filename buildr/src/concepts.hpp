@@ -8,4 +8,4 @@ concept DescribeableStruct =
     boost::describe::has_describe_members<T>::value && !std::is_union_v<T>;
 
 template <typename T>
-concept DescribeabelEnum = boost::describe::has_describe_enumerators<T>::value;
+concept DescribeableEnum = boost::describe::has_describe_enumerators<T>::value;
